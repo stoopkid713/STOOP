@@ -1,0 +1,11 @@
+{
+  "log_path": "C:\\Users\\Admin\\AppData\\Local\\TL\\Saved\\CombatLogs",
+  "player_name": "",
+  "auto_detect_log": true,
+  "broadcast_interval": 0.5,
+  "hotkey_enabled": true,
+  "hotkey": "ctrl+tab",
+  "hotkey_sound": false,
+  "party_token": "",
+  "party_enabled": false
+}

@@ -1,0 +1,125 @@
+[
+  {
+    "run_id": "20260118_193650",
+    "run_name": "Guild Raids Week 4",
+    "dungeon_category": "Guild Boss",
+    "dungeon_name": "Guild Boss",
+    "dungeon_info": {
+      "type": "Guild Boss",
+      "mode": null,
+      "tier": null,
+      "name": null
+    },
+    "player_class": "Oracle",
+    "build_tag": "4 Piece Blood",
+    "contribution_percent": null,
+    "got_loot": true,
+    "loot_item": "Aelon Bow",
+    "encounters": [
+      {
+        "target_name": "Ascended Malakar",
+        "category": "field_boss",
+        "start_time": "2026-01-18T18:33:50",
+        "end_time": "2026-01-18T18:36:43",
+        "duration": 173,
+        "total_damage": 22251727,
+        "dps": 128622.69942196531,
+        "hit_count": 4894,
+        "merged": false,
+        "merged_from": null,
+        "is_attempt": false
+      },
+      {
+        "target_name": "Ascended Grand Aelon",
+        "category": "field_boss",
+        "start_time": "2026-01-18T18:38:17",
+        "end_time": "2026-01-18T18:40:23",
+        "duration": 126,
+        "total_damage": 21665742,
+        "dps": 171950.33333333334,
+        "hit_count": 5024,
+        "merged": false,
+        "merged_from": null,
+        "is_attempt": false
+      },
+      {
+        "target_name": "Ascended Grand Aelon",
+        "category": "field_boss",
+        "start_time": "2026-01-18T18:46:50",
+        "end_time": "2026-01-18T18:49:15",
+        "duration": 145,
+        "total_damage": 22053630,
+        "dps": 152094,
+        "hit_count": 5398,
+        "merged": false,
+        "merged_from": null,
+        "is_attempt": false
+      },
+      {
+        "target_name": "Ascended Grand Aelon",
+        "category": "field_boss",
+        "start_time": "2026-01-18T18:50:06",
+        "end_time": "2026-01-18T18:52:21",
+        "duration": 135,
+        "total_damage": 23677803,
+        "dps": 175391.13333333333,
+        "hit_count": 5374,
+        "merged": false,
+        "merged_from": null,
+        "is_attempt": false
+      },
+      {
+        "target_name": "Ascended Grand Aelon",
+        "category": "field_boss",
+        "start_time": "2026-01-18T18:53:45",
+        "end_time": "2026-01-18T18:55:44",
+        "duration": 119,
+        "total_damage": 20070650,
+        "dps": 168660.9243697479,
+        "hit_count": 4499,
+        "merged": false,
+        "merged_from": null,
+        "is_attempt": false
+      },
+      {
+        "target_name": "Ascended Grand Aelon",
+        "category": "field_boss",
+        "start_time": "2026-01-18T18:56:45",
+        "end_time": "2026-01-18T18:58:42",
+        "duration": 117,
+        "total_damage": 21986778,
+        "dps": 187921.1794871795,
+        "hit_count": 4728,
+        "merged": false,
+        "merged_from": null,
+        "is_attempt": false
+      },
+      {
+        "target_name": "Ascended Grand Aelon",
+        "category": "field_boss",
+        "start_time": "2026-01-18T18:59:52",
+        "end_time": "2026-01-18T19:01:40",
+        "duration": 108,
+        "total_damage": 20143671,
+        "dps": 186515.47222222222,
+        "hit_count": 4628,
+        "merged": false,
+        "merged_from": null,
+        "is_attempt": false
+      }
+    ],
+    "stats": {
+      "total_damage": 151850001,
+      "dps": 164517.8775731311,
+      "duration": 923,
+      "downtime": 747,
+      "boss_dps": 164517.8775731311,
+      "trash_dps": 0,
+      "boss_damage": 151850001,
+      "trash_damage": 0,
+      "encounter_count": 7,
+      "attempt_count": 0
+    },
+    "created_at": "2026-01-18T19:36:50.918481"
+  }
+]

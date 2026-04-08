@@ -1,0 +1,13 @@
+{
+  "skills": {
+    "Abyssal Burst": {
+      "cannot_crit": true,
+      "cannot_heavy": true
+    },
+    "Touch of Despair": {
+      "cannot_crit": true,
+      "cannot_heavy": true
+    }
+  },
+  "last_updated": "2026-01-19T00:18:15.836672"
+}

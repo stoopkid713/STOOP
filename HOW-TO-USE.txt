@@ -1,0 +1,21 @@
+TL DPS Meter 
+============ 
+ 
+1. Double-click TL-DPS-Meter.exe 
+2. Browser opens automatically with the dashboard 
+3. Play Throne and Liberty with combat logging enabled 
+4. Press Ctrl+Tab anytime to reset encounter (global hotkey) 
+ 
+First Run: 
+- The app will ask for your combat log folder path 
+- Default: %LOCALAPPDATA%\TL\Saved\CombatLogs 
+ 
+Global Hotkey: 
+- Default: Ctrl+Tab (resets encounter from anywhere) 
+- Change in Settings if needed 
+- A beep confirms the reset 
+ 
+Troubleshooting: 
+- If "Disconnected" in browser, make sure .exe is running 
+- If no data appears, check combat logging is enabled in game 
+- If hotkey doesn't work, it may be used by another application 
