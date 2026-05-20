@@ -60,7 +60,13 @@
     "Manaball": "wand",
     "Chaotic Shield": "wand",
     "Counterattack Spell": "wand",
-    "Rupturing Parry": "wand"
+    "Rupturing Parry": "wand",
+    "Time Bomb": "mastery",
+    "Tempest Strike": "spear",
+    "Strategic Rush": "sns",
+    "Rising Slash": "spear",
+    "Desperate Clash": "sns",
+    "Chain Hook": "sns"
   },
-  "last_updated": "2026-01-23T01:16:23.529800"
+  "last_updated": "2026-04-09T21:02:26.727535"
 }

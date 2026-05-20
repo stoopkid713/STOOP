@@ -7,7 +7,15 @@
     "Touch of Despair": {
       "cannot_crit": true,
       "cannot_heavy": true
+    },
+    "Vampiric Contract": {
+      "cannot_crit": true,
+      "cannot_heavy": true
+    },
+    "Enraged Tevent's Hunger": {
+      "cannot_crit": true,
+      "cannot_heavy": true
     }
   },
-  "last_updated": "2026-01-19T00:18:15.836672"
+  "last_updated": "2026-04-09T17:05:07.572246"
 }

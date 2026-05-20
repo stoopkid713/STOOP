@@ -26,6 +26,98 @@
             border-right: 1px solid #334155;
             display: flex;
             flex-direction: column;
+            transition: width 0.25s ease;
+            overflow: hidden;
+        }
+        .sidebar.collapsed {
+            width: 48px;
+        }
+        .sidebar.collapsed .sidebar-content,
+        .sidebar.collapsed .controls {
+            display: none !important;
+        }
+        .sidebar.collapsed .sidebar-header {
+            height: 48px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: none;
+            background: none;
+            overflow: hidden;
+        }
+        .sidebar.collapsed .sidebar-header > *:not(.sidebar-collapse-btn) {
+            display: none !important;
+        }
+        .sidebar.collapsed .sidebar-collapse-btn {
+            position: static;
+            display: flex !important;
+        }
+        .sidebar-collapse-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid #334155;
+            color: #64748b;
+            border-radius: 5px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+        .sidebar-collapse-btn:hover { background: rgba(255,255,255,0.12); color: #e2e8f0; }
+        .sidebar.collapsed .sidebar-collapse-btn {
+            position: static;
+            display: flex !important;
+        }
+        .sidebar-icon-strip {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 0;
+            flex: 1;
+            border-top: 1px solid #334155;
+        }
+        .sidebar.collapsed .sidebar-icon-strip {
+            display: flex !important;
+        }
+        .sidebar-icon-btn {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            background: transparent;
+            border: none;
+            color: #64748b;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .sidebar-icon-btn:hover {
+            background: rgba(255,255,255,0.08);
+            color: #e2e8f0;
+        }
+        .sidebar-icon-btn.danger:hover {
+            background: rgba(239,68,68,0.15);
+            color: #ef4444;
+        }
+        .sidebar-icon-btn.status-dot-btn {
+            cursor: default;
+            font-size: 0.5rem;
+        }
+        .sidebar-icon-strip-spacer {
+            flex: 1;
         }
 
         .sidebar-header {
@@ -7829,6 +7921,9 @@
             border-radius: 20px;
             max-width: 700px;
             width: 100%;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), 0 0 100px rgba(34, 211, 238, 0.1);
             overflow: hidden;
             animation: welcomeSlideIn 0.3s ease;
@@ -7846,10 +7941,11 @@
         }
 
         .welcome-header {
-            padding: 28px 32px 20px;
+            padding: 18px 32px 14px;
             text-align: center;
             border-bottom: 1px solid #334155;
             background: linear-gradient(135deg, rgba(34, 211, 238, 0.05) 0%, transparent 100%);
+            flex-shrink: 0;
         }
 
         .welcome-title {
@@ -7945,7 +8041,9 @@
         }
 
         .welcome-content {
-            padding: 24px;
+            padding: 16px 24px;
+            overflow-y: auto;
+            flex: 1;
         }
 
         .welcome-cards-label {
@@ -7954,20 +8052,20 @@
             color: #64748b;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin-bottom: 16px;
+            margin-bottom: 10px;
         }
 
         .welcome-cards {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 14px;
+            gap: 10px;
         }
 
         .welcome-card {
             background: rgba(30, 41, 59, 0.6);
             border: 1px solid #334155;
-            border-radius: 14px;
-            padding: 18px;
+            border-radius: 12px;
+            padding: 12px 14px;
             cursor: pointer;
             transition: all 0.25s ease;
             position: relative;
@@ -8059,12 +8157,13 @@
         }
 
         .welcome-footer {
-            padding: 18px 24px;
+            padding: 14px 24px;
             border-top: 1px solid #334155;
             display: flex;
             align-items: center;
             justify-content: space-between;
             background: rgba(15, 23, 42, 0.5);
+            flex-shrink: 0;
         }
 
         .welcome-never-show {
@@ -8510,6 +8609,15 @@
             <div class="welcome-content" id="welcomeDetectedContent">
                 <div class="welcome-cards-label">Quick Actions</div>
                 <div class="welcome-cards">
+                    <div class="welcome-card purple full-width" onclick="closeWelcomeModal(); startTour();">
+                        <div class="welcome-card-header">
+                            <span class="welcome-card-icon">🗺️</span>
+                            <span class="welcome-card-title">Take a Tour</span>
+                            <span class="welcome-card-arrow">→</span>
+                        </div>
+                        <div class="welcome-card-desc">New here? Get a guided walkthrough of every feature in the app</div>
+                    </div>
+
                     <div class="welcome-card cyan" onclick="welcomeGoTo('dashboard')">
                         <div class="welcome-card-header">
                             <span class="welcome-card-icon">📊</span>
@@ -8631,8 +8739,9 @@
     </div>
 
     <div class="app">
-        <aside class="sidebar">
+        <aside class="sidebar" id="mainSidebar">
             <div class="sidebar-header">
+                <button class="sidebar-collapse-btn" onclick="toggleSidebar()" id="sidebarCollapseBtn" title="Collapse sidebar">‹</button>
                 <div class="brand-logo">
                     <div class="brand-main">
                         <div class="brand-swords">⚔</div>
@@ -8698,7 +8807,7 @@
                     <div style="display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 1;">
                         
                         <!-- Unassigned Targets Card -->
-                        <div id="unassignedTargetsCard" onclick="openSettings(); setTimeout(() => document.querySelector('[data-settings-tab=\\'targets\\']')?.click(), 100);" style="padding: 12px; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 8px; cursor: pointer; transition: all 0.2s; position: relative;" onmouseover="this.style.background='rgba(251, 191, 36, 0.15)'" onmouseout="this.style.background='rgba(251, 191, 36, 0.08)'">
+                        <div id="unassignedTargetsCard" onclick="switchTab('targetAssign')" style="padding: 12px; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 8px; cursor: pointer; transition: all 0.2s; position: relative;" onmouseover="this.style.background='rgba(251, 191, 36, 0.15)'" onmouseout="this.style.background='rgba(251, 191, 36, 0.08)'">
                             <div onclick="event.stopPropagation(); showDataHealthInfo('targets')" style="position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; background: rgba(100, 116, 139, 0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(100, 116, 139, 0.5)'" onmouseout="this.style.background='rgba(100, 116, 139, 0.3)'">
                                 <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">?</span>
                             </div>
@@ -8715,7 +8824,7 @@
                         </div>
                         
                         <!-- Unassigned Skills Card -->
-                        <div id="unassignedSkillsCard" onclick="openSettings(); setTimeout(() => document.querySelector('[data-settings-tab=\\'skills\\']')?.click(), 100);" style="padding: 12px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; cursor: pointer; transition: all 0.2s; position: relative;" onmouseover="this.style.background='rgba(168, 85, 247, 0.15)'" onmouseout="this.style.background='rgba(168, 85, 247, 0.08)'">
+                        <div id="unassignedSkillsCard" onclick="switchTab('skillAssign')" style="padding: 12px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 8px; cursor: pointer; transition: all 0.2s; position: relative;" onmouseover="this.style.background='rgba(168, 85, 247, 0.15)'" onmouseout="this.style.background='rgba(168, 85, 247, 0.08)'">
                             <div onclick="event.stopPropagation(); showDataHealthInfo('skills')" style="position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; background: rgba(100, 116, 139, 0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='rgba(100, 116, 139, 0.5)'" onmouseout="this.style.background='rgba(100, 116, 139, 0.3)'">
                                 <span style="font-size: 0.7rem; color: #94a3b8; font-weight: 600;">?</span>
                             </div>
@@ -8740,8 +8849,19 @@
                 <div style="display: flex; gap: 8px;">
                     <button class="btn-settings" onclick="openSettings()">⚙️ Settings</button>
                     <button class="btn-settings" onclick="openGuide()">📖 Guide</button>
+                    <button class="btn-settings" onclick="startTour()" style="color:#a78bfa;">🗺️ Tour</button>
                 </div>
-                <a href="https://buymeacoffee.com/sirphz" target="_blank" class="btn btn-coffee">☕ Buy Me a Coffee</a>
+            </div>
+
+            <!-- Collapsed icon strip — only visible when sidebar is collapsed -->
+            <div class="sidebar-icon-strip">
+                <button class="sidebar-icon-btn status-dot-btn" id="sidebarStatusDot" title="Connection status">🟢</button>
+                <button class="sidebar-icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+                <button class="sidebar-icon-btn" onclick="openGuide()" title="Guide">📖</button>
+                <button class="sidebar-icon-btn" onclick="startTour()" title="Tour" style="color:#a78bfa;">🗺️</button>
+                <button class="sidebar-icon-btn" onclick="openLogsFolder()" title="Open Logs Folder">📂</button>
+                <div class="sidebar-icon-strip-spacer"></div>
+                <button class="sidebar-icon-btn danger" onclick="purgeLogFile()" title="Purge LogFile">🗑️</button>
             </div>
         </aside>
 
@@ -9011,7 +9131,7 @@
                                     <div style="font-size: 0.75rem; font-weight: 700; color: #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px;">📋 Session Queue</div>
                                     <span id="sessionQueueCount" style="font-size: 0.7rem; padding: 2px 8px; background: rgba(167, 139, 250, 0.2); color: #a78bfa; border-radius: 10px; font-weight: 700;">0 runs</span>
                                 </div>
-                                <div id="sessionQueueList" style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;"></div>
+                                <div id="sessionQueueList" style="max-height: 300px; overflow-y: auto; overflow-x: hidden; margin-bottom: 10px;"></div>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                                     <button onclick="saveAllSessionRuns()" id="saveAllSessionBtn"
                                         style="padding: 10px; font-size: 0.8rem; font-weight: 700; background: linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(34, 197, 94, 0.15) 100%); border: 1px solid rgba(34, 197, 94, 0.5); color: #22c55e; border-radius: 8px; cursor: pointer; transition: all 0.2s;"
@@ -9214,6 +9334,7 @@
                                                         <span style="font-size:0.68rem; color:#475569;">Burst window outlined green</span>
                                                     </div>
                                                 </div>
+                                                <div id="rotationSkillToggles" class="rl-toggle-bar" style="margin-bottom:8px;"></div>
                                                 <div class="rotation-chart-body">
                                                     <div class="rotation-yaxis" id="rotationYAxis"></div>
                                                     <div style="flex:1; display:flex; flex-direction:column;">
@@ -9797,7 +9918,10 @@
                         <!-- Left Panel: Encounter List -->
                         <div class="encounters-list-panel">
                             <div class="encounters-list-header">
-                                <h3>📜 Session Encounters</h3>
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                                    <h3>📜 Session Encounters</h3>
+                                    <button onclick="refreshEncounterTimeline()" style="padding: 5px 10px; background: #22c55e; border: none; color: white; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3); transition: all 0.2s;" onmouseover="this.style.background='#16a34a'" onmouseout="this.style.background='#22c55e'">🔄 Refresh</button>
+                                </div>
                                 <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">Click to view details</div>
                                 <button id="hideAddsToggle" onclick="toggleHideAddsOther()" style="width: 100%; padding: 8px 12px; margin-bottom: 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; color: #ef4444; font-size: 0.85rem; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
                                     👥 Adds/Other Hidden <span style="background: #ef4444; color: white; padding: 1px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 4px;">0</span>
@@ -9835,8 +9959,16 @@
                                         <span id="encDetailDuration" class="encounters-detail-duration">--</span>
                                         <span id="encDetailCategory" class="encounters-detail-category"></span>
                                     </div>
-                                    <div class="encounters-detail-meta">
+                                    <div class="encounters-detail-meta" style="display:flex;align-items:center;gap:10px;">
                                         <span id="encDetailTime">--</span>
+                                        <button id="encSaveBtn" onclick="openEncounterSaveModal()"
+                                            style="padding:5px 12px;background:linear-gradient(135deg,rgba(34,211,238,0.15),rgba(167,139,250,0.1));
+                                                   border:1px solid rgba(34,211,238,0.4);border-radius:7px;color:#22d3ee;
+                                                   font-size:0.75rem;font-weight:600;cursor:pointer;white-space:nowrap;"
+                                            onmouseover="this.style.background='rgba(34,211,238,0.2)'"
+                                            onmouseout="this.style.background='linear-gradient(135deg,rgba(34,211,238,0.15),rgba(167,139,250,0.1))'">
+                                            💾 Save
+                                        </button>
                                     </div>
                                 </div>
                                 
@@ -9972,15 +10104,21 @@
                                                 <div class="rotation-chart-header">
                                                     <h3>📊 DPS Timeline</h3>
                                                     <div class="rotation-chart-legend">
-                                                        <span><span class="legend-dot damage"></span> Damage</span>
-                                                        <span><span class="legend-dot burst"></span> Burst</span>
                                                         <span><span class="legend-dot gap"></span> Gap</span>
+                                                        <span style="font-size:0.68rem; color:#475569;">Burst window outlined green</span>
                                                     </div>
                                                 </div>
-                                                <div class="rotation-dps-chart" id="encRotationDpsChart"></div>
-                                                <div class="rotation-chart-xaxis" id="encRotationXAxis">
-                                                    <span>0s</span><span>15s</span><span>30s</span><span>45s</span><span>60s</span>
+                                                <div id="encRotationSkillToggles" class="rl-toggle-bar" style="margin-bottom:8px;"></div>
+                                                <div class="rotation-chart-body">
+                                                    <div class="rotation-yaxis" id="encRotationYAxis"></div>
+                                                    <div style="flex:1; display:flex; flex-direction:column;">
+                                                        <div class="rotation-dps-chart" id="encRotationDpsChart"></div>
+                                                        <div class="rotation-chart-xaxis" id="encRotationXAxis">
+                                                            <span>0s</span><span>15s</span><span>30s</span><span>45s</span><span>60s</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
+                                                <div id="encRotationSkillLegend" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:2px 12px; margin-top:12px; padding-top:10px; border-top:1px solid #1e293b;"></div>
                                             </div>
                                             <div class="rotation-segments" id="encRotationSegments"></div>
                                             <div class="rotation-insights">
@@ -10774,11 +10912,11 @@
             <!-- GitHub Link -->
             <div style="border-top: 1px solid #334155; margin: 20px 0; padding-top: 20px;">
                 <h3 style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 12px;">🔗 Links</h3>
-                <a href="https://github.com/mjb6967/CKdpsApp" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(30, 41, 59, 0.8); border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.borderColor='#22d3ee'; this.style.background='rgba(34, 211, 238, 0.1)';" onmouseout="this.style.borderColor='#334155'; this.style.background='rgba(30, 41, 59, 0.8)';">
+                <a href="https://github.com/stoopkid713/TL-DPS-Meter" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(30, 41, 59, 0.8); border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.borderColor='#22d3ee'; this.style.background='rgba(34, 211, 238, 0.1)';" onmouseout="this.style.borderColor='#334155'; this.style.background='rgba(30, 41, 59, 0.8)';">
                     <svg height="24" width="24" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
                     <div>
                         <div style="font-weight: 600;">GitHub Repository</div>
-                        <div style="font-size: 0.75rem; color: #64748b;">github.com/mjb6967/CKdpsApp</div>
+                        <div style="font-size: 0.75rem; color: #64748b;">github.com/stoopkid713/TL-DPS-Meter</div>
                     </div>
                 </a>
             </div>
@@ -10794,19 +10932,56 @@
     <div class="modal-overlay" id="saveModal">
         <div class="modal">
             <h2>💾 Save Encounter<button onclick="closeSaveModal()">×</button></h2>
-            <div id="savePreview" style="margin-bottom: 20px;">
-                <div class="summary-cards">
-                    <div class="summary-card">
-                        <div class="value purple" id="savePreviewDps">0</div>
-                        <div class="label">1-Min DPS</div>
+
+            <!-- Encounter context — shown when saving from Encounters tab -->
+            <div id="saveEncounterContext" style="display:none; margin-bottom:16px; padding:12px 14px;
+                 background:rgba(15,23,42,0.6); border:1px solid #334155; border-radius:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <div>
+                        <div id="saveEncTarget" style="font-size:1rem;font-weight:700;color:#e2e8f0;"></div>
+                        <div style="display:flex;gap:10px;margin-top:4px;">
+                            <span id="saveEncDuration" style="font-size:0.78rem;color:#64748b;"></span>
+                            <span id="saveEncDps" style="font-size:0.78rem;color:#a78bfa;font-weight:600;"></span>
+                            <span id="saveEncCrit" style="font-size:0.78rem;color:#fbbf24;"></span>
+                        </div>
                     </div>
-                    <div class="summary-card">
-                        <div class="value" id="savePreviewTotal">0</div>
-                        <div class="label">Total Damage</div>
+                    <span id="saveEncBadge" style="font-size:0.65rem;font-weight:700;text-transform:uppercase;
+                          letter-spacing:0.8px;padding:3px 8px;border-radius:4px;
+                          background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);">Boss</span>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.8rem;color:#94a3b8;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                        📊 Contribution %
+                        <span style="color:#475569;font-size:0.72rem;font-weight:400;">(optional — used to calculate boss total HP)</span>
+                    </label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="number" id="contributionPct" min="0.1" max="100" step="0.1"
+                               placeholder="e.g. 23.5"
+                               style="width:100px;padding:8px 10px;background:#0f172a;border:1px solid #334155;
+                                      border-radius:7px;color:#e2e8f0;font-size:0.9rem;"
+                               oninput="updateBossHpCalc()">
+                        <span style="color:#64748b;">%</span>
+                        <div id="bossHpCalc" style="font-size:0.8rem;color:#a78bfa;font-weight:600;"></div>
                     </div>
-                    <div class="summary-card">
-                        <div class="value" id="savePreviewDuration">0s</div>
-                        <div class="label">Duration</div>
+                </div>
+            </div>
+
+            <!-- Build Test preview — shown when saving from Build Testing -->
+            <div id="saveBuildTestContext">
+                <div id="savePreview" style="margin-bottom: 20px;">
+                    <div class="summary-cards">
+                        <div class="summary-card">
+                            <div class="value purple" id="savePreviewDps">0</div>
+                            <div class="label">1-Min DPS</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="value" id="savePreviewTotal">0</div>
+                            <div class="label">Total Damage</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="value" id="savePreviewDuration">0s</div>
+                            <div class="label">Duration</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -11040,7 +11215,7 @@
             <div class="guide-content">
                 <!-- Quick Overview -->
                 <div class="guide-intro">
-                    <p><strong>ツCKヤ DPS Meter v1.0</strong> — Real-time combat log parser for Throne and Liberty.</p>
+                    <p><strong>ツCKヤ DPS Meter — StoopKid Beta</strong> — Combat log analyzer for Throne and Liberty.</p>
                     <p>⚡ Stats update after <strong>leaving combat</strong> (500ms refresh rate).</p>
                     <p>🔄 <strong>Reset Encounter</strong> before each pull for clean data.</p>
                     <p>⌨️ Global hotkey (default <strong>Ctrl+Tab</strong>) resets from anywhere.</p>
@@ -11404,42 +11579,36 @@
                         <div class="changelog-section">
                             <div class="changelog-version">
                                 <div class="changelog-version-header">
-                                    <span class="changelog-version-number">v1.0</span>
-                                    <span class="changelog-version-date">December 27, 2024</span>
+                                    <span class="changelog-version-number">StoopKid Beta</span>
+                                    <span class="changelog-version-date">2026</span>
                                 </div>
                                 <ul class="changelog-list">
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Dashboard</strong> — Home screen with lifetime stats and quick actions</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Run Builder</strong> — Build dungeon runs from encounter timeline</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Run Summary</strong> — View saved runs with boss/adds breakdown</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Target Assign</strong> — Categorize targets (Archboss, Raid Boss, Adds, etc.)</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Build Testing redesign</strong> — Summary, Skills, Weapon Stats, Rotation sub-tabs</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Hierarchical dungeon selection</strong> — Type → Mode → Tier → Name</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Custom dungeon management</strong> — Add/delete types and entries</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Multi-select drag-and-drop</strong> — Ctrl+Click to select multiple encounters</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Adds grouping</strong> — Consecutive adds collapse into expandable groups</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>Piano roll timeline</strong> — Visual skill timeline in Summary tab</li>
-                                    <li><span class="changelog-tag new">NEW</span> <strong>GitHub link</strong> in Settings</li>
-                                    <li><span class="changelog-tag improved">IMPROVED</span> Skill Assign uses popup modal (like Target Assign)</li>
-                                    <li><span class="changelog-tag improved">IMPROVED</span> Boss encounters highlighted with colored borders and glows</li>
-                                    <li><span class="changelog-tag improved">IMPROVED</span> Save modal with class preview card</li>
-                                    <li><span class="changelog-tag improved">IMPROVED</span> Header redesign with math formulas background</li>
-                                    <li><span class="changelog-tag improved">IMPROVED</span> 180-day license period (was 90 days)</li>
-                                    <li><span class="changelog-tag fix">FIX</span> Reset encounter race condition with buffered data</li>
+                                    <li><span class="changelog-tag new">NEW</span> <strong>Run Lab</strong> — Compare two runs side-by-side with skill matrix, cast drilldown, and interval analysis</li>
+                                    <li><span class="changelog-tag new">NEW</span> <strong>Session Queue</strong> — Auto-queue completed runs, tag inline, bulk-save at end of session</li>
+                                    <li><span class="changelog-tag new">NEW</span> <strong>A/B slot assignment</strong> — Assign any two queued runs to Run Lab with one click</li>
+                                    <li><span class="changelog-tag new">NEW</span> <strong>Stacked DPS Timeline</strong> — Per-skill color breakdown in the Rotation chart with real Y-axis values</li>
+                                    <li><span class="changelog-tag new">NEW</span> <strong>Interactive Tour</strong> — Step-by-step walkthrough of the app with demo data</li>
+                                    <li><span class="changelog-tag improved">IMPROVED</span> Performance Analysis — 9 skill-aware insights including weak window cause, dropped cast detection, consistency score</li>
+                                    <li><span class="changelog-tag improved">IMPROVED</span> Hit type tracking — Crit%, Heavy%, and Crit+Heavy% shown everywhere including per-skill in Run Lab</li>
+                                    <li><span class="changelog-tag improved">IMPROVED</span> Run Lab Key Findings — surfaces top causes of DPS difference with estimated damage impact</li>
+                                    <li><span class="changelog-tag improved">IMPROVED</span> Session Queue shows individual ✕ remove per run</li>
                                 </ul>
                             </div>
 
                             <div class="changelog-version">
                                 <div class="changelog-version-header">
-                                    <span class="changelog-version-number">v0.19 and earlier</span>
-                                    <span class="changelog-version-date">December 2024</span>
+                                    <span class="changelog-version-number">v1.0 (base)</span>
+                                    <span class="changelog-version-date">December 2024 — SirPHz</span>
                                 </div>
                                 <ul class="changelog-list">
-                                    <li>Weapons tab with Skill Assign and Weapon Stats</li>
-                                    <li>Skill Settings for excluding skills from crit/heavy rates</li>
-                                    <li>Load Encounter, Party DPS (beta), Compare tab</li>
-                                    <li>Guide modal, global hotkey support</li>
-                                    <li>Save encounters with build tags</li>
-                                    <li>Real-time DPS tracking, rotation analysis, timeline visualization</li>
+                                    <li>Build Testing tab with Summary, Skills, Weapons, Rotation sub-tabs</li>
+                                    <li>Run Builder for tracking dungeon runs</li>
+                                    <li>Compare tab for side-by-side build comparison</li>
+                                    <li>Class selection, grouping by class in Saved list</li>
+                                    <li>Party DPS (beta) via Supabase Realtime</li>
+                                    <li>Target assignment system, custom dungeon definitions</li>
+                                    <li>Piano roll timeline, gap detection, rotation analysis</li>
+                                    <li>Global hotkey support (Ctrl+Tab)</li>
                                 </ul>
                             </div>
                         </div>
@@ -11450,19 +11619,24 @@
                 <div class="accordion-item">
                     <div class="accordion-header" onclick="toggleAccordion(this)">
                         <span class="accordion-icon">▶</span>
-                        <span class="accordion-title">❤️ Special Thanks</span>
+                        <span class="accordion-title">❤️ Credits</span>
                     </div>
                     <div class="accordion-content">
-                        <p style="color: #94a3b8; margin-bottom: 12px;">Thanks to everyone who helped make this tool better through feedback and testing:</p>
-                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <p style="color: #94a3b8; margin-bottom: 12px;">Built on top of the original CK DPS Meter by SirPHz. Continued and extended by the guild.</p>
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
                             <div style="background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(167, 139, 250, 0.1)); border: 1px solid rgba(34, 211, 238, 0.3); padding: 10px 16px; border-radius: 8px;">
-                                <span style="color: #22d3ee; font-weight: 600;">stoopkid4529</span>
+                                <div style="color: #22d3ee; font-weight: 600;">SirPHz</div>
+                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Original creator</div>
                             </div>
-                            <div style="background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(167, 139, 250, 0.1)); border: 1px solid rgba(34, 211, 238, 0.3); padding: 10px 16px; border-radius: 8px;">
-                                <span style="color: #22d3ee; font-weight: 600;">hauntyx</span>
+                            <div style="background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(167, 139, 250, 0.1)); border: 1px solid rgba(167, 139, 250, 0.3); padding: 10px 16px; border-radius: 8px;">
+                                <div style="color: #a78bfa; font-weight: 600;">stoopkid4529</div>
+                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Fork development</div>
+                            </div>
+                            <div style="background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(167, 139, 250, 0.1)); border: 1px solid rgba(100, 116, 139, 0.3); padding: 10px 16px; border-radius: 8px;">
+                                <div style="color: #94a3b8; font-weight: 600;">hauntyx</div>
+                                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">Testing &amp; feedback</div>
                             </div>
                         </div>
-                        <p style="color: #64748b; font-size: 0.85rem; margin-top: 12px;">Feedback and bug testing</p>
                     </div>
                 </div>
 
@@ -11574,6 +11748,19 @@
             return num.toLocaleString();
         }
 
+        // Skill color palette — consistent hash-based, global scope
+        const SKILL_PALETTE = [
+            '#22d3ee','#a78bfa','#fb923c','#34d399','#f472b6',
+            '#fbbf24','#60a5fa','#f87171','#4ade80','#c084fc',
+            '#38bdf8','#fb7185','#a3e635','#e879f9','#2dd4bf',
+            '#fdba74','#818cf8','#86efac','#fcd34d','#94a3b8'
+        ];
+        function skillColor(name) {
+            let h = 0;
+            for (let i = 0; i < name.length; i++) { h = Math.imul(31, h) + name.charCodeAt(i) | 0; }
+            return SKILL_PALETTE[Math.abs(h) % SKILL_PALETTE.length];
+        }
+
         // Escape HTML to prevent XSS attacks from user-provided content
         function escapeHtml(text) {
             if (!text) return '';
@@ -11603,6 +11790,8 @@
         function setConnectionStatus(connected) {
             document.getElementById('statusDot').classList.toggle('connected', connected);
             document.getElementById('statusText').textContent = connected ? 'Connected' : 'Disconnected';
+            const stripDot = document.getElementById('sidebarStatusDot');
+            if (stripDot) stripDot.textContent = connected ? '🟢' : '🔴';
             // Update Build Testing tab connection status
             updateBuildTestingStatus(connected);
         }
@@ -11740,31 +11929,10 @@
 
         function updateLicenseInfo(license) {
             const container = document.getElementById('versionInfo');
-            if (!license) {
-                container.innerHTML = '';
-                return;
-            }
-            
-            const days = license.days_remaining;
-            let licenseClass = 'ok';
-            let licenseText = '';
-            
-            if (days === 999 || !license.expires) {
-                // No expiration
-                licenseText = '✔ Licensed';
-            } else if (days <= 7) {
-                licenseClass = 'danger';
-                licenseText = `⚠️ ${days}d left`;
-            } else if (days <= 30) {
-                licenseClass = 'warning';
-                licenseText = `${days}d left`;
-            } else {
-                licenseText = `${days}d left`;
-            }
-            
+            // Show static version — no license system in this fork
             container.innerHTML = `
-                <span class="version">v${license.version}</span>
-                <span class="license ${licenseClass}">${licenseText}</span>
+                <span class="version">StoopKid Beta</span>
+                <span class="license ok">Open</span>
             `;
         }
 
@@ -12099,142 +12267,20 @@
                 }
             });
 
-            // Find max DPS for scaling
-            const maxDps = Math.max(...Object.values(dpsPerSecond), 1);
-            
-            // Calculate 5-second rolling DPS to find burst windows and gaps
+            // Calculate 5-second rolling DPS to find burst windows
             const rollingDps = [];
             for (let i = 0; i <= 55; i++) {
                 let sum = 0;
-                for (let j = i; j < i + 5; j++) {
-                    sum += dpsPerSecond[j] || 0;
-                }
+                for (let j = i; j < i + 5; j++) { sum += dpsPerSecond[j] || 0; }
                 rollingDps.push({ start: i, dps: sum / 5 });
             }
-            
-            // Find peak 5s window
-            const peakWindow = rollingDps.reduce((max, curr) => curr.dps > max.dps ? curr : max, { dps: 0, start: 0 });
-            
-            // Find worst 5s window (after combat started)
+            const peakWindow  = rollingDps.reduce((max, curr) => curr.dps > max.dps ? curr : max, { dps: 0, start: 0 });
             const firstHitTime = Math.floor(rotation[0]?.relative_time || 0);
-            const lastHitTime = Math.floor(rotation[rotation.length - 1]?.relative_time || 0);
-            const activeRolling = rollingDps.filter(r => r.start >= firstHitTime && r.start <= Math.min(lastHitTime - 5, 55));
-            const worstWindow = activeRolling.length > 0 ? activeRolling.reduce((min, curr) => curr.dps < min.dps ? curr : min, { dps: Infinity, start: 0 }) : { dps: 0, start: 0 };
+            const lastHitTime  = Math.floor(rotation[rotation.length - 1]?.relative_time || 0);
 
-            // === DPS Timeline Chart ===
-            const chartContainer = document.getElementById('rotationDpsChart');
-            const yAxisContainer = document.getElementById('rotationYAxis');
-
-            // Skill color palette — consistent hash-based assignment
-            const SKILL_PALETTE = [
-                '#22d3ee','#a78bfa','#fb923c','#34d399','#f472b6',
-                '#fbbf24','#60a5fa','#f87171','#4ade80','#c084fc',
-                '#38bdf8','#fb7185','#a3e635','#e879f9','#2dd4bf',
-                '#fdba74','#818cf8','#86efac','#fcd34d','#94a3b8'
-            ];
-            function skillColor(name) {
-                let h = 0;
-                for (let i = 0; i < name.length; i++) { h = Math.imul(31, h) + name.charCodeAt(i) | 0; }
-                return SKILL_PALETTE[Math.abs(h) % SKILL_PALETTE.length];
-            }
-
-            // Build per-second per-skill damage map
-            const secSkillDmg = {};
-            for (let i = 0; i <= 60; i++) secSkillDmg[i] = {};
-            rotation.forEach(hit => {
-                const sec = Math.floor(hit.relative_time || 0);
-                if (sec <= 60) {
-                    const sk = hit.skill || 'Unknown';
-                    secSkillDmg[sec][sk] = (secSkillDmg[sec][sk] || 0) + hit.damage;
-                }
-            });
-
-            // Compute nice Y-axis ticks
-            function computeYTicks(maxVal, numTicks) {
-                if (!maxVal) return [0, 100000];
-                const rough = maxVal / numTicks;
-                const magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
-                const norm = rough / magnitude;
-                const niceStep = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
-                const step = niceStep * magnitude;
-                const ticks = [];
-                for (let t = 0; t <= maxVal + step; t += step) ticks.push(Math.round(t));
-                return ticks;
-            }
-
-            const yTicks = computeYTicks(maxDps, 4);
-            const chartMax = yTicks[yTicks.length - 1] || 1;
-
-            // Y-axis labels
-            if (yAxisContainer) {
-                yAxisContainer.innerHTML = yTicks.map(t => {
-                    const pct = (t / chartMax) * 100;
-                    return `<div style="position:absolute; bottom:${pct}%; right:5px; transform:translateY(50%);
-                                 font-size:0.58rem; color:#64748b; white-space:nowrap; font-variant-numeric:tabular-nums;">
-                                ${formatNumber(t)}
-                            </div>`;
-                }).join('');
-            }
-
-            // Gridlines behind bars
-            let chartHtml = yTicks.map(t => {
-                const pct = (t / chartMax) * 100;
-                return `<div style="position:absolute; bottom:${pct}%; left:0; right:0; height:1px;
-                             background:rgba(255,255,255,${t === 0 ? '0.1' : '0.05'});
-                             pointer-events:none; z-index:0;"></div>`;
-            }).join('');
-
-            // Stacked bars — one column per second
-            for (let i = 0; i <= 60; i++) {
-                const totalDmg = dpsPerSecond[i] || 0;
-                const barPct = chartMax > 0 ? (totalDmg / chartMax * 100) : 0;
-                const isGap = totalDmg === 0 && i >= firstHitTime && i <= lastHitTime;
-                const isBurst = i >= peakWindow.start && i < peakWindow.start + 5 && totalDmg > 0;
-
-                if (isGap) {
-                    chartHtml += `<div class="rotation-dps-bar gap-zone" style="height:2%;z-index:1;" title="${i}s: no damage (gap)"></div>`;
-                    continue;
-                }
-                if (totalDmg === 0) {
-                    chartHtml += `<div style="flex:1;min-width:2px;"></div>`;
-                    continue;
-                }
-
-                // Sort skill segments by damage desc (largest at bottom)
-                const segs = Object.entries(secSkillDmg[i]).sort((a, b) => b[1] - a[1]);
-                const segHtml = segs.map(([sk, dmg], idx) => {
-                    const pct = (dmg / totalDmg) * 100;
-                    const isLast = idx === segs.length - 1;
-                    return `<div style="width:100%; height:${isLast ? Math.max(pct,0) : pct}%;
-                                 background:${skillColor(sk)}; flex-shrink:0; min-height:${dmg>0?'1px':'0'};"
-                                 title="${sk}: ${formatNumber(dmg)}"></div>`;
-                }).join('');
-
-                const outline = isBurst ? 'box-shadow:0 0 0 1px rgba(34,197,94,0.8);' : '';
-                chartHtml += `<div class="rotation-dps-bar" style="height:${Math.max(barPct,1)}%;
-                                  display:flex; flex-direction:column-reverse; background:none;
-                                  padding:0; gap:0; overflow:hidden; z-index:1; ${outline}"
-                                  title="${i}s: ${formatNumber(totalDmg)} total">${segHtml}</div>`;
-            }
-            chartContainer.innerHTML = chartHtml;
-
-            // === Skill Color Legend ===
-            const allSkills = [...new Set(rotation.map(h => h.skill || 'Unknown'))];
-            const skillTotalDmg = {};
-            allSkills.forEach(sk => {
-                skillTotalDmg[sk] = rotation.filter(h => (h.skill||'Unknown') === sk).reduce((s,h) => s+h.damage, 0);
-            });
-            const sortedLegendSkills = allSkills.sort((a,b) => skillTotalDmg[b] - skillTotalDmg[a]);
-
-            const legendEl = document.getElementById('rotationSkillLegend');
-            if (legendEl) {
-                legendEl.innerHTML = sortedLegendSkills.map(sk =>
-                    `<div style="display:flex; align-items:center; gap:5px; padding:2px 0;">
-                         <div style="width:10px; height:10px; border-radius:2px; background:${skillColor(sk)}; flex-shrink:0;"></div>
-                         <span style="font-size:0.68rem; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${sk}">${sk}</span>
-                     </div>`
-                ).join('');
-            }
+            // === DPS Timeline Chart — shared stacked renderer ===
+            lastRotationCache = { rotation, gapStats };
+            renderBTStackedChart(rotation);
 
             // === Segment Analysis (4 quarters) ===
             const segments = [
@@ -13013,34 +13059,54 @@
                                 <span class="saved-class-count">${classEncounters.length}</span>
                             </div>
                         ` : ''}
-                        ${classEncounters.map(enc => `
+                        ${classEncounters.map(enc => {
+                            // Normalize dual schema (BT saves vs Encounter saves)
+                            const isBTSave  = !!enc.first_60s;
+                            const dps       = isBTSave ? (enc.first_60s?.dps || 0)          : (enc.dps || 0);
+                            const totalDmg  = isBTSave ? (enc.overall?.total_damage || 0)   : (enc.total_damage || 0);
+                            const duration  = isBTSave ? (enc.overall?.duration || 0)       : (enc.duration || 0);
+                            const critRate  = isBTSave ? (enc.first_60s?.crit_rate || 0)    : (enc.crit_rate || 0);
+                            const target    = isBTSave ? (enc.primary_target || '--')       : (enc.target_name || '--');
+                            const dpsLabel  = isBTSave ? '1-Min DPS' : 'DPS';
+                            const cat       = enc.category || (isBTSave ? 'training' : '');
+                            const catLabel  = cat.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+                            const catColor  = cat.includes('arch') ? '#ef4444' : cat.includes('field') ? '#fbbf24' : cat.includes('raid') ? '#f472b6' : '#64748b';
+                            // Parse contribution info out of notes
+                            const { contribPct, bossHp, cleanNotes } = parseContribNotes(enc.notes);
+                            const contribHtml = contribPct
+                                ? `<div class="encounter-stat" style="color:#a78bfa;">
+                                       <strong>${contribPct.toFixed(1)}%</strong> contribution
+                                       ${bossHp ? `<span style="color:#64748b;font-size:0.72rem;"> · Boss HP ≈ ${formatNumber(bossHp)}</span>` : ''}
+                                   </div>` : '';
+                            return `
                             <div class="encounter-item" data-id="${enc.id}">
                                 <div class="encounter-header">
                                     <span class="encounter-build">${enc.build_tag}</span>
+                                    ${catLabel ? `<span style="font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:2px 6px;border-radius:3px;background:${catColor}22;color:${catColor};border:1px solid ${catColor}44;margin-left:6px;">${catLabel}</span>` : ''}
                                     <span class="encounter-date" style="margin-left: auto;">${formatDate(enc.timestamp)}</span>
                                 </div>
-                                ${enc.notes ? `<div style="font-size: 0.8rem; color: #94a3b8; margin: 4px 0 8px 0; font-style: italic; padding-left: 8px; border-left: 2px solid #334155;">${enc.notes}</div>` : ''}
+                                ${cleanNotes ? `<div style="font-size: 0.8rem; color: #94a3b8; margin: 4px 0 8px 0; font-style: italic; padding-left: 8px; border-left: 2px solid #334155;">${cleanNotes}</div>` : ''}
                                 <div class="encounter-stats">
                                     <div class="encounter-stat highlight">
-                                        <strong>${formatNumber(Math.round(enc.first_60s.dps))}</strong> 1-Min DPS
+                                        <strong>${formatNumber(Math.round(dps))}</strong> ${dpsLabel}
                                     </div>
                                     <div class="encounter-stat">
-                                        <strong>${formatNumber(enc.overall.total_damage)}</strong> total
+                                        <strong>${formatNumber(totalDmg)}</strong> total
                                     </div>
                                     <div class="encounter-stat">
-                                        <strong>${formatDuration(enc.overall.duration)}</strong>
+                                        <strong>${formatDuration(duration)}</strong>
                                     </div>
                                     <div class="encounter-stat">
-                                        <strong>${enc.first_60s.crit_rate.toFixed(1)}%</strong> crit
+                                        <strong>${critRate.toFixed(1)}%</strong> crit
                                     </div>
+                                    ${contribHtml}
                                 </div>
-                                <div class="encounter-target">⚖️ ${enc.primary_target}</div>
+                                <div class="encounter-target">⚖️ ${target}</div>
                                 <div class="encounter-actions">
                                     <button class="btn btn-small" onclick="editEncounter('${enc.id}', event)">✏️ Edit</button>
                                     <button class="btn btn-small btn-danger" onclick="deleteEncounter('${enc.id}', event)">🗑️ Delete</button>
                                 </div>
-                            </div>
-                        `).join('')}
+                            </div>`}).join('')}
                     </div>
                 `;
             });
@@ -13080,11 +13146,12 @@
         function updateBuildFilters() {
             const filterSelect = document.getElementById('filterBuild');
             const currentValue = filterSelect.value;
-            
+            const visible = visibleBuildTags();
+
             filterSelect.innerHTML = '<option value="">All Builds</option>' +
-                buildTags.map(tag => `<option value="${tag}">${tag}</option>`).join('');
-            
-            if (buildTags.includes(currentValue)) {
+                visible.map(tag => `<option value="${tag}">${tag}</option>`).join('');
+
+            if (visible.includes(currentValue)) {
                 filterSelect.value = currentValue;
             }
         }
@@ -13420,13 +13487,19 @@
             });
         }
 
+        // Filter out internal session queue placeholder tags from any UI
+        function visibleBuildTags() {
+            return buildTags.filter(t => !/^__sq_/.test(t));
+        }
+
         function updateRecentBuildTags() {
             const container = document.getElementById('recentBuildTags');
-            if (buildTags.length === 0) {
+            const visible = visibleBuildTags();
+            if (visible.length === 0) {
                 container.innerHTML = '';
                 return;
             }
-            container.innerHTML = buildTags.slice(0, 8).map(tag => 
+            container.innerHTML = visible.slice(0, 8).map(tag =>
                 `<span class="build-tag" onclick="selectBuildTag('${tag}')">${tag}</span>`
             ).join('');
         }
@@ -13924,33 +13997,16 @@
                     <div class="separator-line"></div>
                 </div>
                 ${rankingHtml}
+                ${buildsData.length >= 2 ? renderCompareKeyFindings(buildsData) : ''}
             `;
-            
-            // Populate Skills Breakdown section
+
+            // Populate Skills Breakdown section — upgraded cross-build matrix
             skillsContainer.innerHTML = `
                 <div class="compare-section-header">
-                    <h3>💥 Skill Breakdown by Build</h3>
-                    <p class="section-description">Compare skill usage and damage output. Colors indicate unique skills and performance differences.</p>
+                    <h3>💥 Skill Breakdown</h3>
+                    <p class="section-description">Damage, casts, avg/cast and C+H% per skill across all builds.</p>
                 </div>
-                
-                <div class="compare-legend">
-                    <div class="compare-legend-item">
-                        <span class="compare-legend-dot unique"></span>
-                        <span>Unique skill (only one build uses it)</span>
-                    </div>
-                    <div class="compare-legend-item">
-                        <span class="compare-legend-dot better"></span>
-                        <span>Best value (highest damage for this skill)</span>
-                    </div>
-                    <div class="compare-legend-item">
-                        <span class="compare-legend-dot worse"></span>
-                        <span>Lowest value (lowest damage for this skill)</span>
-                    </div>
-                </div>
-                
-                <div class="compare-container ${colClass}">
-                    ${encounters.map(e => renderEncounterPanel(e, encounters, winnerLabels.includes(e.label))).join('')}
-                </div>
+                ${renderCrossSkillMatrix(buildsData)}
             `;
             
             // Populate Skill Timeline section
@@ -13983,30 +14039,48 @@
                 </div>
             `;
             
-            // Populate Rotation section
+            // Populate Rotation section — stacked skill charts per build
+            compareRotationData = {}; // reset
+            buildsData.forEach(b => {
+                compareRotationData[b.label] = b.bestEncounter?.first_60s?.rotation || [];
+            });
+            // Reset hidden skills for removed builds
+            if (!compareRotationData['A']) compareHiddenSkillsA.clear();
+            if (!compareRotationData['B']) compareHiddenSkillsB.clear();
+            if (!compareRotationData['C']) compareHiddenSkillsC.clear();
+
+            const rotChartHtml = buildsData.map(b => `
+                <div data-compare-build="${b.label}" style="margin-bottom:20px;background:rgba(15,23,42,0.4);border:1px solid #1e293b;border-radius:10px;padding:14px 16px;">
+                    <div style="font-size:0.77rem;font-weight:700;color:#94a3b8;margin-bottom:10px;">${b.label}: ${b.enc?.build_tag||''} ${winnerLabels.includes(b.label)?'👑':''}</div>
+                    <div style="display:flex;gap:4px;margin-bottom:2px;">
+                        <div id="compareRotYAxis_${b.label}" style="position:relative;width:36px;flex-shrink:0;"></div>
+                        <div id="compareRotChart_${b.label}" class="rotation-dps-chart" style="flex:1;height:100px;display:flex;align-items:flex-end;gap:1px;background:rgba(0,0,0,0.2);border-radius:4px;padding:4px 4px 0;position:relative;overflow:hidden;"></div>
+                    </div>
+                    <div style="font-size:0.65rem;color:#475569;display:flex;justify-content:space-between;padding:0 0 6px 40px;">
+                        <span>0s</span><span>15s</span><span>30s</span><span>45s</span><span>60s</span>
+                    </div>
+                    <div id="compareRotToggles_${b.label}" class="rotation-skill-toggles" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>
+                    <div id="compareRotLegend_${b.label}" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+                </div>
+            `).join('');
+
             rotationContainer.innerHTML = `
                 <div class="compare-section-header">
-                    <h3>📈 Segment Breakdown (DPS by Quarter)</h3>
-                    <p class="section-description">DPS performance across four 15-second segments (0-15s, 15-30s, 30-45s, 45-60s).</p>
-                </div>
-                
-                <div class="compare-rotation-section">
-                    ${renderSegmentComparison()}
-                </div>
-                
-                <div class="compare-section-header" style="margin-top: 32px;">
                     <h3>📊 Rotation Analysis</h3>
-                    <p class="section-description">DPS consistency over time, activity rate, and peak 5-second burst damage.</p>
+                    <p class="section-description">Stacked skill DPS chart per build. Use toggles to filter skills.</p>
                 </div>
-                
-                <div class="compare-rotation-section">
-                    <div class="compare-rotation-charts">
-                        ${rotationData.map(e => renderRotationChart(e, winnerLabels.includes(e.label))).join('')}
-                    </div>
-                    
-                    ${renderActivityComparison()}
+                ${rotChartHtml}
+                <div class="compare-section-header" style="margin-top:16px;">
+                    <h3>📈 Segment Breakdown</h3>
+                    <p class="section-description">DPS across four 15-second segments.</p>
                 </div>
+                <div class="compare-rotation-section">${renderSegmentComparison()}</div>
             `;
+
+            // Render stacked charts after DOM update
+            setTimeout(() => {
+                buildsData.forEach(b => refreshCompareRotationChart(b.label));
+            }, 50);
         }
         
         function toggleUnassignedTargets() {
@@ -16162,6 +16236,19 @@ ${attemptLine}
         
         // === BUILD TESTING TAB ===
         let buildTestActive = false; // Is a 60s test currently running?
+        let saveSource = 'buildtest'; // 'buildtest' | 'encounter'
+        let saveSourceEncounter = null;
+        let savingFromEncounterHistory = false; // two-step save flow flag
+        let pendingEncounterSave = null; // { buildTag, classValue, classInfo, notes } stored during load step
+        let rotationHiddenSkills    = new Set(); // Skills hidden from stacked chart (build testing)
+        let compareHiddenSkillsA   = new Set(); // Compare tab rotation chart hidden skills per build
+        let compareHiddenSkillsB   = new Set();
+        let compareHiddenSkillsC   = new Set();
+        let compareDrilldownSkill  = null;       // Currently drilled skill in compare tab
+        let compareDrilldownBuild  = null;       // Which build is being drilled
+        let encRotationHiddenSkills = new Set(); // Skills hidden from stacked chart (encounters)
+        let lastRotationCache    = null; // { rotation, gapStats } for BT chart re-render on toggle
+        let lastEncRotationCache = null; // { rotation, duration } for enc chart re-render on toggle
         let buildTestComplete = false; // Has the current test completed?
         let buildTestStartTime = null; // When did the test start?
         let lastTestData = null; // Data from last completed test
@@ -16407,6 +16494,50 @@ ${attemptLine}
 
         // === SESSION QUEUE FUNCTIONS ===
 
+        // Auto-detect class from rotation skill usage
+        function detectClassFromRotation(rotation) {
+            if (!rotation || !rotation.length) return '';
+
+            const assignments = weaponConfig.skillAssignments || {};
+            const EXCLUDED = new Set(['mastery', 'other']);
+
+            // Map weapon_config keys → TL_CLASSES weapon name strings
+            const WEAPON_MAP = {
+                'spear':      'Spear',
+                'dagger':     'Daggers',
+                'orb':        'Orb',
+                'wand':       'Wand',
+                'crossbow':   'Crossbow',
+                'longbow':    'Longbow',
+                'staff':      'Staff',
+                'greatsword': 'Greatsword',
+                'sword':      'Sword & Shield'
+            };
+
+            // Sum damage per weapon type
+            const weaponDmg = {};
+            rotation.forEach(hit => {
+                const wt = assignments[hit.skill || ''];
+                if (!wt || EXCLUDED.has(wt)) return;
+                weaponDmg[wt] = (weaponDmg[wt] || 0) + (hit.damage || 0);
+            });
+
+            if (!Object.keys(weaponDmg).length) return '';
+
+            // Top 2 weapon types by total damage
+            const top2 = Object.entries(weaponDmg)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2)
+                .map(([wt]) => WEAPON_MAP[wt])
+                .filter(Boolean);
+
+            if (top2.length < 2) return '';
+
+            // Find the class whose weapons string contains both detected types
+            const match = TL_CLASSES.find(c => top2.every(w => c.weapons.includes(w)));
+            return match ? match.name : '';
+        }
+
         function queueCompletedRun(data) {
             sessionRunCounter++;
             const first60 = data.first_60s || data;
@@ -16414,13 +16545,18 @@ ${attemptLine}
             const targetName = targets.length > 0 ? targets[0].name : 'Unknown';
             const placeholderTag = `__sq_${Date.now()}_${sessionRunCounter}__`;
 
+            const detectedClass = detectClassFromRotation(data.rotation_60s || []);
+            const resolvedClass = detectedClass || selectedClass || '';
+            if (detectedClass) selectedClass = detectedClass; // update for subsequent saves
+
             const item = {
                 runNumber: sessionRunCounter,
                 tempTag: placeholderTag,
                 finalTag: '',
-                playerClass: selectedClass || '',
+                playerClass: resolvedClass,
                 notes: '',
                 dps: Math.round(first60.dps || 0),
+                totalDamage: Math.round(first60.total_damage || 0),
                 critRate: parseFloat((first60.raw_crit_rate || 0).toFixed(1)),
                 heavyRate: parseFloat((first60.raw_heavy_rate || 0).toFixed(1)),
                 critHeavyRate: parseFloat((first60.crit_heavy_rate || 0).toFixed(1)),
@@ -16511,22 +16647,22 @@ ${attemptLine}
                     color:${item.runLabSlot==='B' ? '#a78bfa' : '#64748b'};">B</button>`;
 
                 return `
-                <div style="padding:9px 10px; background:rgba(15,23,42,0.6); border:1px solid ${borderColor}; border-radius:8px; margin-bottom:7px; transition:border-color 0.3s;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
+                <div style="padding:9px 10px; background:rgba(15,23,42,0.6); border:1px solid ${borderColor}; border-radius:8px; margin-bottom:7px; transition:border-color 0.3s; box-sizing:border-box;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                         <span style="font-size:0.68rem; color:#64748b; font-weight:700; text-transform:uppercase;">Run #${item.runNumber}</span>
                         <div style="display:flex; align-items:center; gap:5px;">
                             <span style="font-size:0.82rem; font-weight:700; color:#a78bfa;">${formatNumber(item.dps)} DPS</span>
-                            <span style="font-size:0.65rem; color:#fbbf24;" title="Crit rate">${item.critRate}%C</span>
-                            <span style="font-size:0.65rem; color:#fb923c;" title="Heavy rate">${item.heavyRate}%H</span>
-                            <span style="font-size:0.65rem; color:#f472b6; font-weight:700;" title="Crit+Heavy rate (the big ones)">${item.critHeavyRate || 0}%CH</span>
-                            ${slotBtnA}${slotBtnB}
-                            ${statusBadge}
-                            ${!item.saved ? `<button onclick="removeQueueItem(${i})" title="Remove this run"
-                                style="padding:1px 6px; font-size:0.7rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);
-                                       color:#ef4444; border-radius:4px; cursor:pointer; line-height:1.4; flex-shrink:0;"
-                                onmouseover="this.style.background='rgba(239,68,68,0.25)'"
-                                onmouseout="this.style.background='rgba(239,68,68,0.1)'">✕</button>` : ''}
+                            <span style="font-size:0.72rem; color:#64748b;" title="60s total damage">${formatNumber(item.totalDamage || 0)}</span>
                         </div>
+                    </div>
+                    <div style="display:flex; justify-content:flex-end; align-items:center; gap:5px; margin-bottom:7px;">
+                        ${slotBtnA}${slotBtnB}
+                        ${statusBadge}
+                        ${!item.saved ? `<button onclick="removeQueueItem(${i})" title="Remove this run"
+                            style="padding:1px 6px; font-size:0.7rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3);
+                                   color:#ef4444; border-radius:4px; cursor:pointer; line-height:1.4; flex-shrink:0;"
+                            onmouseover="this.style.background='rgba(239,68,68,0.25)'"
+                            onmouseout="this.style.background='rgba(239,68,68,0.1)'">✕</button>` : ''}
                     </div>
                     <input type="text"
                            value="${escapeHtml(item.finalTag)}"
@@ -16921,14 +17057,18 @@ ${attemptLine}
         }
 
         function renderRunLabToggles() {
+            const hiddenSkills = new Set(runLabMatrix.filter(r=>!runLabVisibleSkills.has(r.skill)).map(r=>r.skill));
+            const weaponGroups = renderWeaponGroupToggles(runLabMatrix.map(r=>r.skill), hiddenSkills, 'toggleRotationSkill', 'rotationShowAll');
             document.getElementById('runLabToggles').innerHTML =
                 `<span class="rl-toggle-label">Show:</span>` +
                 runLabMatrix.map(row =>
                     `<button class="rl-skill-toggle ${runLabVisibleSkills.has(row.skill)?'on':''}"
                              onclick="toggleRunLabSkill('${escapeHtml(row.skill)}')">${escapeHtml(row.skill)}</button>`
                 ).join('') +
-                `<button class="rl-skill-toggle" onclick="runLabShowAll()" style="border-color:#334155;color:#64748b;">All</button>
-                 <button class="rl-skill-toggle" onclick="runLabShowNone()" style="border-color:#334155;color:#64748b;">None</button>`;
+                `<span style="display:inline-block;width:1px;height:14px;background:#334155;margin:0 4px;vertical-align:middle;"></span>` +
+                `<button class="rl-skill-toggle" onclick="runLabShowAll()" style="border-color:#22c55e;color:#22c55e;">All</button>
+                 <button class="rl-skill-toggle" onclick="runLabShowNone()" style="border-color:#ef4444;color:#ef4444;">None</button>` +
+                (weaponGroups ? `<span style="display:inline-block;width:1px;height:14px;background:#334155;margin:0 4px;vertical-align:middle;"></span>${weaponGroups}` : '');
         }
 
         function renderRunLabPiano(runA, runB) {
@@ -19883,6 +20023,13 @@ ${attemptLine}
                 alert('No test data to save!\n\nClick "Reset Encounter" and complete a 60-second build test first.');
                 return;
             }
+
+            saveSource = 'buildtest';
+            saveSourceEncounter = null;
+
+            // Show BT context, hide encounter context
+            document.getElementById('saveBuildTestContext').style.display = 'block';
+            document.getElementById('saveEncounterContext').style.display = 'none';
             
             document.getElementById('savePreviewDps').textContent = formatNumber(Math.round(currentStats.dps_60s || 0));
             document.getElementById('savePreviewTotal').textContent = formatNumber(currentStats.total_damage);
@@ -19892,13 +20039,8 @@ ${attemptLine}
             const classSelect = document.getElementById('saveClassSelect');
             classSelect.innerHTML = '<option value="">-- Select Your Class --</option>' + 
                 TL_CLASSES.map(c => `<option value="${c.name}">${c.name}: ${c.weapons}</option>`).join('');
+            classSelect.onchange = function() { updateClassPreview(this.value); };
             
-            // Add change handler for class preview
-            classSelect.onchange = function() {
-                updateClassPreview(this.value);
-            };
-            
-            // Restore last selected class and show preview
             if (selectedClass) {
                 classSelect.value = selectedClass;
                 updateClassPreview(selectedClass);
@@ -19910,6 +20052,61 @@ ${attemptLine}
             document.getElementById('buildTagInput').value = '';
             document.getElementById('encounterNotes').value = '';
             document.getElementById('saveModal').classList.add('active');
+        }
+
+        function openEncounterSaveModal() {
+            if (!selectedEncounterData) {
+                alert('No encounter selected.');
+                return;
+            }
+
+            saveSource = 'encounter';
+            saveSourceEncounter = selectedEncounterData;
+
+            const enc = selectedEncounterData;
+            const totalDmg = enc.total_damage || 0;
+            const dps      = enc.dps || (totalDmg / (enc.duration || 1));
+            const cat      = (enc.category || '').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+            // Show encounter context, hide BT preview
+            document.getElementById('saveBuildTestContext').style.display = 'none';
+            document.getElementById('saveEncounterContext').style.display = 'block';
+            document.getElementById('saveEncTarget').textContent   = enc.target_name || 'Unknown';
+            document.getElementById('saveEncDuration').textContent = formatDuration(enc.duration || 0);
+            document.getElementById('saveEncDps').textContent      = formatNumber(Math.round(dps)) + ' DPS';
+            document.getElementById('saveEncCrit').textContent     = (enc.crit_rate || 0).toFixed(1) + '% crit';
+            document.getElementById('saveEncBadge').textContent    = cat || 'Encounter';
+            document.getElementById('contributionPct').value       = '';
+            document.getElementById('bossHpCalc').textContent      = '';
+
+            // Populate class dropdown
+            const classSelect = document.getElementById('saveClassSelect');
+            classSelect.innerHTML = '<option value="">-- Select Your Class --</option>' +
+                TL_CLASSES.map(c => `<option value="${c.name}">${c.name}: ${c.weapons}</option>`).join('');
+            classSelect.onchange = function() { updateClassPreview(this.value); };
+
+            const detectedClass = detectClassFromRotation(enc.hit_log || []) || selectedClass || '';
+            if (detectedClass) {
+                classSelect.value = detectedClass;
+                updateClassPreview(detectedClass);
+            } else {
+                document.getElementById('classPreviewCard').style.display = 'none';
+            }
+
+            updateRecentBuildTags();
+            document.getElementById('buildTagInput').value  = enc.build_tag || '';
+            document.getElementById('encounterNotes').value = enc.notes    || '';
+            document.getElementById('saveModal').classList.add('active');
+        }
+
+        function updateBossHpCalc() {
+            const pct    = parseFloat(document.getElementById('contributionPct').value);
+            const enc    = saveSourceEncounter;
+            const calc   = document.getElementById('bossHpCalc');
+            if (!calc) return;
+            if (!enc || !pct || pct <= 0 || pct > 100) { calc.textContent = ''; return; }
+            const bossHp = Math.round(enc.total_damage / (pct / 100));
+            calc.textContent = `→ Boss HP ≈ ${formatNumber(bossHp)}`;
         }
         
         function updateClassPreview(className) {
@@ -19931,6 +20128,20 @@ ${attemptLine}
 
         function closeSaveModal() {
             document.getElementById('saveModal').classList.remove('active');
+            saveSource = 'buildtest';
+            saveSourceEncounter = null;
+            savingFromEncounterHistory = false;
+            pendingEncounterSave = null;
+            // Re-enable save button in case it was disabled during load step
+            const saveBtn = document.querySelector('#saveModal .btn-primary');
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save'; }
+        }
+
+        // Parse contribution info encoded in notes field: [CONTRIB:pct:bossHp] rest of notes
+        function parseContribNotes(notes) {
+            const m = (notes || '').match(/^\[CONTRIB:([0-9.]+):([0-9]+)\]\s*/);
+            if (!m) return { contribPct: null, bossHp: null, cleanNotes: notes || '' };
+            return { contribPct: parseFloat(m[1]), bossHp: parseInt(m[2]), cleanNotes: notes.slice(m[0].length) };
         }
         
         // === TAG MANAGER ===
@@ -19946,12 +20157,12 @@ ${attemptLine}
         
         function updateTagManagerList() {
             const container = document.getElementById('tagManagerList');
-            if (buildTags.length === 0) {
+            if (visibleBuildTags().length === 0) {
                 container.innerHTML = '<div style="color: #64748b; text-align: center; padding: 20px;">No tags yet. Add one below or save an encounter with a new tag.</div>';
                 return;
             }
             
-            container.innerHTML = buildTags.map(tag => `
+            container.innerHTML = visibleBuildTags().map(tag => `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(30, 41, 59, 0.6); border: 1px solid #334155; border-radius: 8px;">
                     <span style="color: #e2e8f0; font-weight: 500;">🏷️ ${tag}</span>
                     <button onclick="deleteTag('${tag.replace(/'/g, "\\'")}')" style="padding: 4px 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 4px; color: #ef4444; cursor: pointer; font-size: 0.8rem;" onmouseover="this.style.background='rgba(239, 68, 68, 0.3)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.2)'">✕</button>
@@ -20915,76 +21126,18 @@ ${attemptLine}
         }
         
         function renderEncDpsChart(rotation, duration) {
-            const container = document.getElementById('encRotationDpsChart');
-            if (!container) {
-                console.error('[Encounters] encRotationDpsChart container not found');
-                return;
+            lastEncRotationCache = { rotation, duration };
+            renderEncStackedChart(rotation, duration);
+            // Update dynamic x-axis labels for variable duration
+            const xAxis = document.getElementById('encRotationXAxis');
+            if (xAxis) {
+                const maxSec = Math.min(Math.ceil(duration), 120);
+                const interval = maxSec <= 60 ? 15 : maxSec <= 120 ? 30 : 60;
+                const markers = [];
+                for (let t = 0; t <= maxSec; t += interval) markers.push(`<span>${t}s</span>`);
+                if (parseInt(markers[markers.length-1].match(/\d+/)?.[0]||0) < maxSec) markers.push(`<span>${maxSec}s</span>`);
+                xAxis.innerHTML = markers.join('');
             }
-            
-            if (!rotation || rotation.length === 0) {
-                container.innerHTML = '<div style="color: #64748b; padding: 20px; text-align: center;">No DPS data available</div>';
-                return;
-            }
-            
-            console.log('[Encounters] renderEncDpsChart - rotation:', rotation.length, 'duration:', duration);
-            
-            // Calculate DPS per second
-            const maxSeconds = Math.ceil(duration);
-            const dpsPerSecond = {};
-            for (let i = 0; i <= maxSeconds; i++) {
-                dpsPerSecond[i] = 0;
-            }
-            
-            rotation.forEach(hit => {
-                const sec = Math.floor(hit.relative_time || 0);
-                if (sec <= maxSeconds) {
-                    dpsPerSecond[sec] = (dpsPerSecond[sec] || 0) + hit.damage;
-                }
-            });
-            
-            const maxDps = Math.max(...Object.values(dpsPerSecond), 1);
-            
-            // Find peak 5s window
-            let peakStart = 0;
-            let peakDamage = 0;
-            for (let i = 0; i <= maxSeconds - 5; i++) {
-                let windowDamage = 0;
-                for (let j = i; j < i + 5; j++) {
-                    windowDamage += dpsPerSecond[j] || 0;
-                }
-                if (windowDamage > peakDamage) {
-                    peakDamage = windowDamage;
-                    peakStart = i;
-                }
-            }
-            
-            // Find first and last hit times
-            const hitTimes = rotation.map(h => Math.floor(h.relative_time || 0));
-            const firstHitTime = Math.min(...hitTimes);
-            const lastHitTime = Math.max(...hitTimes);
-            
-            // Generate bars - one per second (max 120 for display)
-            const numBars = Math.min(maxSeconds + 1, 120);
-            const barScale = maxSeconds / numBars;
-            
-            let chartHtml = '';
-            for (let i = 0; i <= numBars; i++) {
-                const sec = Math.floor(i * barScale);
-                const damage = dpsPerSecond[sec] || 0;
-                const height = maxDps > 0 ? (damage / maxDps * 100) : 0;
-                
-                // Determine bar type
-                let barClass = 'normal';
-                if (damage === 0 && sec >= firstHitTime && sec <= lastHitTime) {
-                    barClass = 'gap-zone';
-                } else if (sec >= peakStart && sec < peakStart + 5 && damage > 0) {
-                    barClass = 'burst-zone';
-                }
-                
-                chartHtml += `<div class="rotation-dps-bar ${barClass}" style="height: ${Math.max(height, 2)}%" title="${sec}s: ${formatNumber(damage)} damage"></div>`;
-            }
-            container.innerHTML = chartHtml;
-            console.log('[Encounters] DPS chart rendered with', numBars, 'bars');
         }
         
         function renderEncSegments(rotation, duration) {
@@ -21067,80 +21220,7 @@ ${attemptLine}
         }
         
         function renderEncInsights(data, rotation, duration) {
-            const container = document.getElementById('encRotationInsights');
-            if (!container) return;
-            
-            if (!rotation || rotation.length === 0) {
-                container.innerHTML = '<div style="color: #64748b; text-align: center; padding: 20px;">No rotation data to analyze</div>';
-                return;
-            }
-            
-            const insights = [];
-            const totalDamage = data.total_damage || 0;
-            const dps = duration > 0 ? totalDamage / duration : 0;
-            
-            // Find burst windows
-            const windowSize = 5;
-            let maxBurstDamage = 0;
-            let burstStart = 0;
-            
-            for (let i = 0; i <= duration - windowSize; i++) {
-                const windowHits = rotation.filter(h => h.relative_time >= i && h.relative_time < i + windowSize);
-                const windowDamage = windowHits.reduce((sum, h) => sum + h.damage, 0);
-                if (windowDamage > maxBurstDamage) {
-                    maxBurstDamage = windowDamage;
-                    burstStart = i;
-                }
-            }
-            
-            if (maxBurstDamage > 0) {
-                const burstDps = maxBurstDamage / windowSize;
-                insights.push({
-                    type: 'success',
-                    icon: '🔥',
-                    text: `Peak ${windowSize}s burst: <span class="rotation-insight-value">${formatNumber(maxBurstDamage)}</span> damage (${formatNumber(Math.round(burstDps))} DPS) at ${burstStart}s-${burstStart + windowSize}s`
-                });
-            }
-            
-            // Crit analysis
-            if (data.crit_rate > 40) {
-                insights.push({
-                    type: 'success',
-                    icon: '⚡',
-                    text: `Excellent crit rate: <span class="rotation-insight-value">${data.crit_rate.toFixed(1)}%</span>`
-                });
-            } else if (data.crit_rate < 20) {
-                insights.push({
-                    type: 'warning',
-                    icon: '⚡',
-                    text: `Low crit rate: <span class="rotation-insight-value">${data.crit_rate.toFixed(1)}%</span> - consider crit gear`
-                });
-            }
-            
-            // Heavy analysis
-            if (data.heavy_rate > 30) {
-                insights.push({
-                    type: 'success',
-                    icon: '💪',
-                    text: `Strong heavy attack rate: <span class="rotation-insight-value">${data.heavy_rate.toFixed(1)}%</span>`
-                });
-            }
-            
-            // Duration insight
-            if (duration > 120) {
-                insights.push({
-                    type: 'info',
-                    icon: '⏱️',
-                    text: `Long encounter: <span class="rotation-insight-value">${formatDuration(duration)}</span> - sustained DPS of ${formatNumber(Math.round(dps))}`
-                });
-            }
-            
-            container.innerHTML = insights.length > 0 ? insights.map(i => `
-                <div class="rotation-insight ${i.type}">
-                    <span class="rotation-insight-icon">${i.icon}</span>
-                    <span class="rotation-insight-text">${i.text}</span>
-                </div>
-            `).join('') : '<div style="color: #64748b; text-align: center; padding: 20px;">No significant issues detected</div>';
+            renderEncInsightsRich(data, rotation, duration);
         }
         
         function renderEncGaps(rotation, duration) {
@@ -21601,27 +21681,52 @@ ${attemptLine}
         }
 
         function saveEncounter() {
-            const buildTag = document.getElementById('buildTagInput').value.trim();
-            const notes = document.getElementById('encounterNotes').value.trim();
+            const buildTag   = document.getElementById('buildTagInput').value.trim();
+            const notes      = document.getElementById('encounterNotes').value.trim();
             const classValue = document.getElementById('saveClassSelect').value;
-            
-            if (!buildTag) {
-                alert('Please enter a build tag');
-                return;
-            }
-            
-            // Remember selected class
+
+            if (!buildTag) { alert('Please enter a build tag'); return; }
+
             selectedClass = classValue;
-            
-            // Find class info
             const classInfo = TL_CLASSES.find(c => c.name === classValue);
-            
-            sendCommand('save_encounter', { 
-                build_tag: buildTag, 
-                notes: notes,
-                player_class: classValue,
-                class_weapons: classInfo ? classInfo.weapons : ''
-            });
+
+            if (saveSource === 'encounter' && saveSourceEncounter) {
+                const enc    = saveSourceEncounter;
+                const pct    = parseFloat(document.getElementById('contributionPct').value) || null;
+                const bossHp = pct ? Math.round(enc.total_damage / (pct / 100)) : null;
+
+                // Encode contribution into notes prefix so backend stores it
+                let fullNotes = notes;
+                if (pct) {
+                    fullNotes = `[CONTRIB:${pct}:${bossHp}]${notes ? ' ' + notes : ''}`;
+                }
+
+                // Store pending save data for after encounter_loaded fires
+                pendingEncounterSave = {
+                    buildTag, classValue, notes: fullNotes,
+                    class_weapons: classInfo ? classInfo.weapons : ''
+                };
+                savingFromEncounterHistory = true;
+
+                // Disable save button to prevent double-tap
+                const saveBtn = document.querySelector('#saveModal .btn-primary');
+                if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Loading…'; }
+
+                // Step 1: load encounter into backend live buffer
+                sendCommand('load_encounter_data', {
+                    target_name: enc.target_name,
+                    start_time:  enc.start_time
+                });
+
+            } else {
+                // Normal Build Testing save
+                sendCommand('save_encounter', {
+                    build_tag:     buildTag,
+                    notes:         notes,
+                    player_class:  classValue,
+                    class_weapons: classInfo ? classInfo.weapons : ''
+                });
+            }
         }
 
         function deleteEncounter(id, event) {
@@ -22372,6 +22477,24 @@ ${attemptLine}
                     }
                 }
                 else if (msg.type === 'encounter_loaded') {
+                    // Check if this load was triggered by the encounter save flow
+                    if (savingFromEncounterHistory && pendingEncounterSave) {
+                        const pending = pendingEncounterSave;
+                        pendingEncounterSave      = null;
+                        savingFromEncounterHistory = false;
+
+                        // Step 2: backend now has the encounter in its live buffer — save it
+                        setTimeout(() => {
+                            sendCommand('save_encounter', {
+                                build_tag:     pending.buildTag,
+                                notes:         pending.notes,
+                                player_class:  pending.classValue,
+                                class_weapons: pending.class_weapons
+                            });
+                        }, 80); // brief delay to ensure backend buffer is settled
+                        return; // suppress all normal encounter_loaded UI side effects
+                    }
+
                     console.log('[EncounterHistory] Encounter data received:', msg.data);
                     // Update all UI with loaded encounter data
                     if (msg.data) {
@@ -24418,7 +24541,1013 @@ ${attemptLine}
         // Initialize target assignments
         initializeTargetAssignments();
         
+        // ============================================================
+        // INTERACTIVE TOUR
+        // ============================================================
+        const TOUR_STEPS = [
+            {
+                icon: '👋',
+                title: 'Welcome to CK DPS Meter',
+                text: 'This quick tour walks you through the key features. Takes about 2 minutes. Use the arrows to navigate or ✕ to skip.',
+                target: null, tab: null
+            },
+            {
+                icon: '🎯',
+                title: 'Build Testing',
+                text: 'Your main workspace for testing builds on the dummy. Everything starts here.',
+                target: '[data-tab="buildTesting"]', tab: 'buildTesting', position: 'bottom'
+            },
+            {
+                icon: '🔄',
+                title: 'Reset Before Every Pull',
+                text: 'Always hit Reset before attacking. It clears the current encounter so your data is clean. The Ctrl+Tab hotkey does the same from in-game.',
+                target: '#resetTestBtn', tab: 'buildTesting', position: 'right'
+            },
+            {
+                icon: '📊',
+                title: 'Your Stats',
+                text: 'After combat ends, your DPS, hits, Crit%, Heavy%, and Crit+Heavy% appear here. C+H hits are max roll AND 2× damage — the ones that really move the needle.',
+                target: '#buildTestStatsPanel', tab: 'buildTesting', position: 'right',
+                demo: 'stats'
+            },
+            {
+                icon: '📋',
+                title: 'Session Queue',
+                text: 'Every completed 60s run automatically queues here. Tag each run with your build name while you keep testing — no need to stop and save between pulls.',
+                target: '#sessionQueuePanel', tab: 'buildTesting', position: 'right',
+                demo: 'queue'
+            },
+            {
+                icon: '🔬',
+                title: 'Run Lab — Compare Two Runs',
+                text: 'Assign any two runs as A and B using the slot buttons, then open Run Lab. It computes the key differences: extra casts, avg damage per cast, and C+H rate per skill.',
+                target: '[data-subtab="runlab"]', tab: 'buildTesting', position: 'bottom',
+                demo: 'queue'
+            },
+            {
+                icon: '📈',
+                title: 'Rotation Analysis',
+                text: 'The stacked chart shows what skill did damage each second. Performance Analysis identifies which skills were absent in your weakest segment and flags dropped casts.',
+                target: null, tab: 'buildTesting', subtab: 'rotation'
+            },
+            {
+                icon: '💾',
+                title: 'Save All When Done',
+                text: 'Once you\'re happy with your session, hit Save All in the queue. Runs get saved with your tags and show up in Saved for long-term tracking.',
+                target: '#saveAllSessionBtn', tab: 'buildTesting', position: 'right',
+                demo: 'queue'
+            },
+            {
+                icon: '⚖️',
+                title: 'Compare Tab',
+                text: 'Compare up to 3 saved builds side by side — skill breakdown, rotation timing, DPS by segment. Great for cross-session build comparisons.',
+                target: '[data-tab="compare"]', tab: 'compare', position: 'bottom'
+            },
+            {
+                icon: '🎉',
+                title: 'You\'re Ready',
+                text: 'Hit the dummy, build your queue, and let Run Lab tell you what\'s actually different. Good luck finding that extra DPS.',
+                target: null, tab: null
+            }
+        ];
+
+        let tourCurrentStep = 0;
+        let tourActive = false;
+        let tourDemoInjected = false;
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('mainSidebar');
+            const btn = document.getElementById('sidebarCollapseBtn');
+            const collapsed = sidebar.classList.toggle('collapsed');
+            btn.textContent = collapsed ? '›' : '‹';
+            btn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        }
+
+        function startTour() {
+            tourActive = true;
+            tourCurrentStep = 0;
+            document.body.style.overflow = 'hidden';
+            document.getElementById('tourOverlay').style.display = 'block';
+            renderTourStep(0);
+        }
+
+        function endTour() {
+            tourActive = false;
+            document.body.style.overflow = '';
+            document.getElementById('tourOverlay').style.display = 'none';
+            document.getElementById('tourSpotlight').style.display = 'none';
+            tourCleanupDemo();
+        }
+
+        function nextTourStep() {
+            if (tourCurrentStep < TOUR_STEPS.length - 1) {
+                tourCurrentStep++;
+                renderTourStep(tourCurrentStep);
+            } else {
+                endTour();
+            }
+        }
+
+        function prevTourStep() {
+            if (tourCurrentStep > 0) {
+                tourCurrentStep--;
+                renderTourStep(tourCurrentStep);
+            }
+        }
+
+        function tourInjectDemo(type) {
+            if (type === 'stats') {
+                // Show fake completed test stats
+                document.getElementById('buildTestStatsPanel').style.display = 'block';
+                document.getElementById('buildTestExtendedStats').style.display = 'grid';
+                document.getElementById('btDps').textContent  = '185,420';
+                document.getElementById('btHits').textContent = '1,847';
+                document.getElementById('btCrit').textContent  = '34.2%';
+                document.getElementById('btHeavy').textContent = '27.8%';
+                document.getElementById('btNormal').textContent    = '53.1%';
+                document.getElementById('btCritHeavy').textContent = '18.3%';
+                document.getElementById('btAvgHit').textContent    = '6,012';
+                const card = document.getElementById('activeTargetCard');
+                if (card) {
+                    card.style.display = 'block';
+                    card.style.borderColor = 'rgba(34,197,94,0.3)';
+                    card.style.background  = 'rgba(34,197,94,0.05)';
+                    card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="font-size:0.75rem;color:#22c55e;font-weight:600;">✓ Test Complete</div>
+                            <div style="font-size:1rem;color:#e2e8f0;font-weight:500;margin-top:4px;">Practice Dummy</div>
+                        </div>
+                        <div style="text-align:right;"><div style="font-size:0.7rem;color:#64748b;">60 seconds</div></div>
+                    </div>`;
+                }
+                tourDemoInjected = true;
+            }
+            if (type === 'queue' && !tourDemoInjected) {
+                // Inject fake session queue runs
+                const fakeRuns = [
+                    { runNumber:1, tempTag:'__demo1__', finalTag:'4pc Blood CDR',  playerClass:'Oracle', dps:192450, critRate:34.2, heavyRate:27.8, critHeavyRate:18.3, id:'__d1__', saved:false, runLabSlot:'A', rotation:[], skills:[], notes:'' },
+                    { runNumber:2, tempTag:'__demo2__', finalTag:'2pc Veiled',      playerClass:'Oracle', dps:178320, critRate:31.5, heavyRate:25.1, critHeavyRate:16.7, id:'__d2__', saved:false, runLabSlot:'B', rotation:[], skills:[], notes:'' },
+                    { runNumber:3, tempTag:'__demo3__', finalTag:'',               playerClass:'',       dps:185890, critRate:33.1, heavyRate:26.4, critHeavyRate:17.9, id:null,    saved:false, runLabSlot:null, rotation:[], skills:[], notes:'' }
+                ];
+                fakeRuns.forEach(r => sessionQueue.push(r));
+                const panel = document.getElementById('sessionQueuePanel');
+                if (panel) panel.style.display = 'block';
+                renderSessionQueue();
+                tourDemoInjected = true;
+            }
+        }
+
+        function tourCleanupDemo() {
+            if (!tourDemoInjected) return;
+            // Remove demo queue items
+            sessionQueue = sessionQueue.filter(i => !i.tempTag || !i.tempTag.startsWith('__demo'));
+            renderSessionQueue();
+            if (sessionQueue.length === 0) {
+                const panel = document.getElementById('sessionQueuePanel');
+                if (panel) panel.style.display = 'none';
+            }
+            // Reset stats display if no real test is complete
+            if (!buildTestComplete) {
+                document.getElementById('buildTestStatsPanel').style.display = 'none';
+                document.getElementById('buildTestExtendedStats').style.display = 'none';
+                const card = document.getElementById('activeTargetCard');
+                if (card) card.style.display = 'none';
+            }
+            tourDemoInjected = false;
+        }
+
+        function renderTourStep(index) {
+            const step = TOUR_STEPS[index];
+            const total = TOUR_STEPS.length;
+
+            // Navigate to right tab
+            if (step.tab) {
+                const tabBtn = document.querySelector(`[data-tab="${step.tab}"]`);
+                if (tabBtn) tabBtn.click();
+            }
+            if (step.subtab) {
+                setTimeout(() => switchBuildTestSubtab(step.subtab), 150);
+            }
+
+            // Inject demo data for this step
+            if (step.demo) tourInjectDemo(step.demo);
+
+            // Update tooltip content
+            document.getElementById('tourStepIcon').textContent  = step.icon;
+            document.getElementById('tourStepTitle').textContent = step.title;
+            document.getElementById('tourStepText').textContent  = step.text;
+            document.getElementById('tourStepCounter').textContent = `Step ${index + 1} of ${total}`;
+
+            // Progress dots
+            document.getElementById('tourDots').innerHTML = TOUR_STEPS.map((_, i) =>
+                `<div style="width:${i===index?'20px':'7px'}; height:7px; border-radius:4px;
+                     background:${i===index?'#a78bfa':'rgba(100,116,139,0.4)'};
+                     transition:all 0.3s;"></div>`
+            ).join('');
+
+            // Buttons
+            document.getElementById('tourPrevBtn').style.display = index === 0 ? 'none' : 'block';
+            document.getElementById('tourNextBtn').textContent = index === total - 1 ? '✓ Done' : 'Next →';
+
+            // Demo steps need extra time for injected panels to reflow before measuring
+            const posDelay = step.demo ? 500 : 220;
+            setTimeout(() => positionTourStep(step), posDelay);
+        }
+
+        function positionTourStep(step) {
+            const backdrop  = document.getElementById('tourBackdrop');
+            const spotlight = document.getElementById('tourSpotlight');
+            const tooltip   = document.getElementById('tourTooltip');
+            const PAD = 10;
+
+            if (!step.target) {
+                // Centered card — use backdrop, hide spotlight
+                spotlight.style.display = 'none';
+                backdrop.style.display  = 'block';
+                backdrop.style.background = 'rgba(0,0,0,0.6)';
+                tooltip.style.top  = '50%';
+                tooltip.style.left = '50%';
+                tooltip.style.transform = 'translate(-50%, -50%)';
+                return;
+            }
+
+            tooltip.style.transform = '';
+            const el = document.querySelector(step.target);
+            if (!el) {
+                spotlight.style.display = 'none';
+                backdrop.style.display  = 'block';
+                tooltip.style.top  = '50%';
+                tooltip.style.left = '50%';
+                tooltip.style.transform = 'translate(-50%, -50%)';
+                return;
+            }
+
+            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            setTimeout(() => {
+                const rect = el.getBoundingClientRect();
+
+                // Guard: if element has no dimensions it's not rendered yet — centre the tooltip
+                if (rect.width === 0 && rect.height === 0) {
+                    spotlight.style.display = 'none';
+                    backdrop.style.display  = 'block';
+                    tooltip.style.top  = '50%';
+                    tooltip.style.left = '50%';
+                    tooltip.style.transform = 'translate(-50%, -50%)';
+                    return;
+                }
+                const vpW  = window.innerWidth;
+                const vpH  = window.innerHeight;
+                const TW   = 320;
+                const TH   = 280;
+
+                // Use spotlight only — hide the separate backdrop to avoid double darkening
+                backdrop.style.display  = 'none';
+                spotlight.style.display = 'block';
+                spotlight.style.top     = (rect.top    - PAD) + 'px';
+                spotlight.style.left    = (rect.left   - PAD) + 'px';
+                spotlight.style.width   = (rect.width  + PAD * 2) + 'px';
+                spotlight.style.height  = (rect.height + PAD * 2) + 'px';
+
+                // Position tooltip
+                let top, left;
+                const pos = step.position || 'bottom';
+                if (pos === 'bottom') {
+                    top  = rect.bottom + PAD + 14;
+                    left = rect.left + rect.width / 2 - TW / 2;
+                    if (top + TH > vpH) top = rect.top - TH - PAD - 14;
+                } else if (pos === 'right') {
+                    top  = rect.top + rect.height / 2 - TH / 2;
+                    left = rect.right + PAD + 14;
+                    if (left + TW > vpW) left = rect.left - TW - PAD - 14;
+                } else if (pos === 'top') {
+                    top  = rect.top - TH - PAD - 14;
+                    left = rect.left + rect.width / 2 - TW / 2;
+                    if (top < 0) top = rect.bottom + PAD + 14;
+                }
+
+                left = Math.max(12, Math.min(left, vpW - TW - 12));
+                top  = Math.max(12, Math.min(top,  vpH - TH - 12));
+
+                tooltip.style.top  = top  + 'px';
+                tooltip.style.left = left + 'px';
+            }, 80);
+        }
+
+        // === ROTATION SKILL FILTER FUNCTIONS ===
+
+        function toggleRotationSkill(skill) {
+            if (rotationHiddenSkills.has(skill)) rotationHiddenSkills.delete(skill);
+            else rotationHiddenSkills.add(skill);
+            if (lastRotationCache) renderBTStackedChart(lastRotationCache.rotation);
+        }
+        function rotationShowAll() {
+            rotationHiddenSkills.clear();
+            if (lastRotationCache) renderBTStackedChart(lastRotationCache.rotation);
+        }
+        function toggleEncRotationSkill(skill) {
+            if (encRotationHiddenSkills.has(skill)) encRotationHiddenSkills.delete(skill);
+            else encRotationHiddenSkills.add(skill);
+            if (lastEncRotationCache) renderEncStackedChart(lastEncRotationCache.rotation, lastEncRotationCache.duration);
+        }
+        function encRotationShowAll() {
+            encRotationHiddenSkills.clear();
+            if (lastEncRotationCache) renderEncStackedChart(lastEncRotationCache.rotation, lastEncRotationCache.duration);
+        }
+
+        function renderStackedDpsChart(rotation, maxSec, hiddenSkills, chartId, yAxisId, togglesId, legendId, toggleFn, showAllFn) {
+            const chart   = document.getElementById(chartId);
+            const yAxis   = document.getElementById(yAxisId);
+            const toggles = document.getElementById(togglesId);
+            const legend  = document.getElementById(legendId);
+            if (!chart) return;
+
+            const skillDmgTotals = {};
+            rotation.forEach(h => { const sk=h.skill||'Unknown'; skillDmgTotals[sk]=(skillDmgTotals[sk]||0)+(h.damage||0); });
+            const sortedSkills = Object.keys(skillDmgTotals).sort((a,b)=>skillDmgTotals[b]-skillDmgTotals[a]);
+
+            const secDmgAll = {};
+            for (let i=0; i<=maxSec; i++) secDmgAll[i]=0;
+            rotation.forEach(h => { const sec=Math.floor(h.relative_time||0); if(sec<=maxSec) secDmgAll[sec]=(secDmgAll[sec]||0)+(h.damage||0); });
+            const maxDpsAll = Math.max(...Object.values(secDmgAll),1);
+
+            const secSkillDmg = {};
+            for (let i=0; i<=maxSec; i++) secSkillDmg[i]={};
+            rotation.forEach(h => {
+                const sec=Math.floor(h.relative_time||0), sk=h.skill||'Unknown';
+                if (sec<=maxSec && !hiddenSkills.has(sk)) secSkillDmg[sec][sk]=(secSkillDmg[sec][sk]||0)+(h.damage||0);
+            });
+
+            const hitTimes = rotation.map(h=>Math.floor(h.relative_time||0));
+            const firstHit = Math.min(...hitTimes), lastHit = Math.max(...hitTimes);
+
+            const rollingDps = [];
+            for (let i=0; i<=maxSec-5; i++) { let s=0; for(let j=i;j<i+5;j++) s+=secDmgAll[j]||0; rollingDps.push({start:i,dps:s/5}); }
+            const peakWindow = rollingDps.length ? rollingDps.reduce((m,c)=>c.dps>m.dps?c:m,{dps:0,start:0}) : {dps:0,start:0};
+
+            function niceYTicks(maxVal,n) {
+                if(!maxVal) return [0,100000];
+                const rough=maxVal/n, mag=Math.pow(10,Math.floor(Math.log10(rough)));
+                const norm=rough/mag, nice=norm<=1?1:norm<=2?2:norm<=2.5?2.5:norm<=5?5:10;
+                const step=nice*mag, ticks=[];
+                for(let t=0;t<=maxVal+step;t+=step) ticks.push(Math.round(t));
+                return ticks;
+            }
+            const yTicks=niceYTicks(maxDpsAll,4), chartMax=yTicks[yTicks.length-1]||1;
+
+            if (yAxis) yAxis.innerHTML = yTicks.map(t => {
+                const pct=(t/chartMax)*100;
+                return `<div style="position:absolute;bottom:${pct}%;right:5px;transform:translateY(50%);font-size:0.58rem;color:#64748b;white-space:nowrap;">${formatNumber(t)}</div>`;
+            }).join('');
+
+            let html = yTicks.map(t => {
+                const pct=(t/chartMax)*100;
+                return `<div style="position:absolute;bottom:${pct}%;left:0;right:0;height:1px;background:rgba(255,255,255,${t===0?'0.1':'0.05'});pointer-events:none;z-index:0;"></div>`;
+            }).join('');
+
+            const numBars = Math.min(maxSec+1,120);
+            for (let i=0; i<=numBars; i++) {
+                const sec=Math.floor(i*(maxSec/numBars));
+                const totalDmg=secDmgAll[sec]||0;
+                const isGap=totalDmg===0&&sec>=firstHit&&sec<=lastHit;
+                const isBurst=sec>=peakWindow.start&&sec<peakWindow.start+5&&totalDmg>0;
+
+                if (isGap) { html+=`<div class="rotation-dps-bar gap-zone" style="height:2%;z-index:1;" title="${sec}s: gap"></div>`; continue; }
+                if (totalDmg===0) { html+=`<div style="flex:1;min-width:2px;"></div>`; continue; }
+
+                const secFiltered=secSkillDmg[sec]||{};
+                const filteredTotal=Object.values(secFiltered).reduce((s,v)=>s+v,0);
+                const barPct=chartMax>0?(filteredTotal/chartMax)*100:0;
+
+                if (filteredTotal===0) { html+=`<div style="flex:1;min-width:2px;"></div>`; continue; }
+
+                const segs=Object.entries(secFiltered).sort((a,b)=>b[1]-a[1]);
+                const segHtml=segs.map(([sk,dmg])=>`<div style="width:100%;height:${(dmg/filteredTotal)*100}%;background:${skillColor(sk)};flex-shrink:0;min-height:${dmg>0?'1px':'0'};" title="${sk}: ${formatNumber(dmg)}"></div>`).join('');
+                const outline=isBurst?'box-shadow:0 0 0 1px rgba(34,197,94,0.8);':'';
+                html+=`<div class="rotation-dps-bar" style="height:${Math.max(barPct,1)}%;display:flex;flex-direction:column-reverse;background:none;padding:0;gap:0;overflow:hidden;z-index:1;${outline}" title="${sec}s: ${formatNumber(filteredTotal)}">${segHtml}</div>`;
+            }
+            chart.innerHTML = html;
+
+            if (toggles) {
+                const weaponGroups = renderWeaponGroupToggles(sortedSkills, hiddenSkills, toggleFn, showAllFn);
+                toggles.innerHTML =
+                    `<span class="rl-toggle-label">Skills:</span>` +
+                    sortedSkills.map(sk=>`<button class="rl-skill-toggle ${!hiddenSkills.has(sk)?'on':''}" onclick="${toggleFn}('${escapeHtml(sk)}')">${escapeHtml(sk)}</button>`).join('') +
+                    `<span style="display:inline-block;width:1px;height:14px;background:#334155;margin:0 4px;vertical-align:middle;"></span>` +
+                    `<button class="rl-skill-toggle" onclick="${showAllFn}()" style="border-color:#22c55e;color:#22c55e;">All</button>` +
+                    `<button class="rl-skill-toggle" onclick="stackedChartHideAll('${toggleFn}',${JSON.stringify(sortedSkills)})" style="border-color:#ef4444;color:#ef4444;">None</button>` +
+                    (weaponGroups ? `<span style="display:inline-block;width:1px;height:14px;background:#334155;margin:0 4px;vertical-align:middle;"></span>${weaponGroups}` : '');
+            }
+
+            if (legend) legend.innerHTML = sortedSkills.map(sk=>
+                `<div style="display:flex;align-items:center;gap:5px;padding:2px 0;opacity:${hiddenSkills.has(sk)?'0.35':'1'}">
+                     <div style="width:10px;height:10px;border-radius:2px;background:${skillColor(sk)};flex-shrink:0;"></div>
+                     <span style="font-size:0.68rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sk}</span>
+                 </div>`
+            ).join('');
+        }
+
+        // ── Weapon group toggle helper ─────────────────────────────────────────
+        function renderWeaponGroupToggles(sortedSkills, hiddenSkills, toggleFn, showAllFn) {
+            const WEAPON_LABELS = {
+                orb:'Orb', wand:'Wand', staff:'Staff', crossbow:'Crossbow',
+                longbow:'Longbow', spear:'Spear', dagger:'Daggers',
+                greatsword:'Greatsword', sword:'Sword & Shield', mastery:'Mastery', other:'Other'
+            };
+            const assignments = weaponConfig?.skillAssignments || {};
+            const groups = {};
+            sortedSkills.forEach(sk => {
+                const wt = assignments[sk] || 'other';
+                if (!groups[wt]) groups[wt] = [];
+                groups[wt].push(sk);
+            });
+            const usefulGroups = Object.entries(groups).filter(([,sks]) => sks.length >= 2);
+            if (!usefulGroups.length) return '';
+            return usefulGroups.map(([wt, sks]) => {
+                const allVisible = sks.every(sk => !hiddenSkills.has(sk));
+                const label = WEAPON_LABELS[wt] || wt;
+                const skJson = escapeHtml(JSON.stringify(sks));
+                return `<button class="rl-skill-toggle ${allVisible?'on':''}"
+                    onclick="toggleWeaponGroupByName('${toggleFn}','${showAllFn}','${wt}',this)"
+                    data-weapon-skills="${skJson}"
+                    style="border-color:${allVisible?'#f472b6':'#334155'};color:${allVisible?'#f472b6':'#64748b'};"
+                    title="Toggle all ${label} skills">${label}</button>`;
+            }).join('');
+        }
+
+        function toggleWeaponGroupByName(toggleFn, showAllFn, weaponType, btn) {
+            const sks = JSON.parse(btn.dataset.weaponSkills || '[]');
+            if (!sks.length) return;
+            // Determine context
+            const isRunLab = !!btn.closest('#runLabToggles');
+            const isBT = !!btn.closest('#rotationSkillToggles');
+            const isEnc = !!btn.closest('#encRotationSkillToggles');
+            const compareBuildEl = btn.closest('[data-compare-build]');
+
+            if (isRunLab) {
+                const allOn = sks.every(sk => runLabVisibleSkills.has(sk));
+                sks.forEach(sk => { if (allOn) runLabVisibleSkills.delete(sk); else runLabVisibleSkills.add(sk); });
+                renderRunLabToggles();
+                const runA = sessionQueue.find(i=>i.runLabSlot==='A');
+                const runB = sessionQueue.find(i=>i.runLabSlot==='B');
+                if (runA && runB) renderRunLabPiano(runA, runB);
+                return;
+            }
+            if (isBT) {
+                const allVisible = sks.every(sk => !rotationHiddenSkills.has(sk));
+                sks.forEach(sk => { if (allVisible) rotationHiddenSkills.add(sk); else rotationHiddenSkills.delete(sk); });
+                if (lastRotationCache) renderBTStackedChart(lastRotationCache.rotation);
+                return;
+            }
+            if (isEnc) {
+                const allVisible = sks.every(sk => !encRotationHiddenSkills.has(sk));
+                sks.forEach(sk => { if (allVisible) encRotationHiddenSkills.add(sk); else encRotationHiddenSkills.delete(sk); });
+                if (lastEncRotationCache) renderEncStackedChart(lastEncRotationCache.rotation, lastEncRotationCache.duration);
+                return;
+            }
+            if (compareBuildEl) {
+                const build = compareBuildEl.dataset.compareBuild;
+                const map = {A:compareHiddenSkillsA, B:compareHiddenSkillsB, C:compareHiddenSkillsC};
+                const hiddenSet = map[build];
+                if (!hiddenSet) return;
+                const allVisible = sks.every(sk => !hiddenSet.has(sk));
+                sks.forEach(sk => { if (allVisible) hiddenSet.add(sk); else hiddenSet.delete(sk); });
+                refreshCompareRotationChart(build);
+                return;
+            }
+        }
+
+        // ── Compare key findings helper ────────────────────────────────────────
+        function computeComparePairFindings(rotW, rotL, slotW, slotL) {
+            if (!rotW || !rotL || !rotW.length || !rotL.length) return [];
+            const matrixW = {}, matrixL = {};
+            function buildMap(rot, map) {
+                rot.forEach(h => {
+                    const sk = h.skill||'Unknown';
+                    if (!map[sk]) map[sk] = {dmg:0,hits:0,crits:0,heavies:0,ch:0,times:[]};
+                    map[sk].dmg += h.damage||0;
+                    map[sk].hits++;
+                    if (h.is_crit && h.is_heavy) map[sk].ch++;
+                    else if (h.is_crit) map[sk].crits++;
+                    else if (h.is_heavy) map[sk].heavies++;
+                    map[sk].times.push(h.relative_time||0);
+                });
+            }
+            buildMap(rotW, matrixW); buildMap(rotL, matrixL);
+            function casts(times) {
+                const s = [...times].sort((a,b)=>a-b); let c=1;
+                for (let i=1;i<s.length;i++) if (s[i]-s[i-1]>0.15) c++;
+                return c;
+            }
+            const allSkills = new Set([...Object.keys(matrixW),...Object.keys(matrixL)]);
+            const findings = [];
+            allSkills.forEach(sk => {
+                const w = matrixW[sk], l = matrixL[sk];
+                if (!w || !l) return;
+                const castsW = casts(w.times), castsL = casts(l.times);
+                const avgW = w.dmg/castsW, avgL = l.dmg/castsL;
+                const chW = w.ch/w.hits*100, chL = l.ch/l.hits*100;
+                const castDiff = castsW - castsL;
+                const avgDiff = avgW - avgL;
+                const avgDiffPct = avgL>0?(avgDiff/avgL*100):0;
+                const castImpact = castDiff>0 ? castDiff*avgW : 0;
+                const avgImpact = Math.abs(avgDiffPct)>8 && castsL>0 ? Math.abs(avgDiff)*Math.min(castsW,castsL) : 0;
+                if (castDiff>0 && castImpact>50000)
+                    findings.push({impact:castImpact, text:`<strong style="color:#e2e8f0">${sk}</strong>: ${slotW} landed <span style="color:#22c55e;font-weight:700">+${castDiff} cast${castDiff>1?'s':''}</span> — ~<span style="color:#a78bfa;font-weight:700">+${formatNumber(Math.round(castImpact))}</span> extra damage`});
+                if (Math.abs(avgDiffPct)>10 && avgImpact>50000 && castsL>0) {
+                    const dir=avgDiff>0?'higher':'lower', col=avgDiff>0?'#22c55e':'#ef4444';
+                    findings.push({impact:avgImpact, text:`<strong style="color:#e2e8f0">${sk}</strong>: avg/cast <span style="color:${col};font-weight:700">${Math.abs(avgDiffPct).toFixed(0)}% ${dir}</span> in ${slotW} — ~<span style="color:#a78bfa;font-weight:700">${formatNumber(Math.round(avgImpact))}</span> swing`});
+                }
+                if (chW-chL>6 && castsW>=3)
+                    findings.push({impact:(chW-chL)*avgW/100*castsW, text:`<strong style="color:#e2e8f0">${sk}</strong>: C+H rate <span style="color:#f472b6;font-weight:700">${chW.toFixed(0)}%</span> vs ${chL.toFixed(0)}% — more big hits in ${slotW}`});
+            });
+            return findings.sort((a,b)=>b.impact-a.impact).slice(0,4);
+        }
+
+        function renderCompareKeyFindings(buildsData) {
+            const winner = buildsData.reduce((w,b) => b.stats.dps>w.stats.dps?b:w, buildsData[0]);
+            const others = buildsData.filter(b => b.label!==winner.label);
+            const dpsDiff = winner.stats.dps - (others[0]?.stats.dps||0);
+            const dpsDiffPct = others[0]?.stats.dps>0 ? (dpsDiff/others[0].stats.dps*100).toFixed(1) : 0;
+
+            const pairHtml = others.map(other => {
+                const findings = computeComparePairFindings(
+                    winner.bestEncounter?.first_60s?.rotation || [],
+                    other.bestEncounter?.first_60s?.rotation || [],
+                    winner.label, other.label
+                );
+                const diff = winner.stats.dps - other.stats.dps;
+                const pct = other.stats.dps>0 ? (diff/other.stats.dps*100).toFixed(1) : 0;
+                return `<div style="margin-bottom:10px;">
+                    <div style="font-size:0.7rem;color:#64748b;margin-bottom:5px;">${winner.label} vs ${other.label} — <span style="color:#22d3ee;font-weight:700">+${formatNumber(Math.round(diff))} DPS (${pct}%)</span></div>
+                    ${findings.length
+                        ? findings.map(f=>`<div style="font-size:0.77rem;color:#94a3b8;padding:5px 8px;background:rgba(15,23,42,0.4);border-radius:5px;margin-bottom:3px;">${f.text}</div>`).join('')
+                        : `<div style="font-size:0.77rem;color:#64748b;padding:5px 0;">Runs are very close — check the skill matrix for fine details.</div>`}
+                </div>`;
+            }).join('');
+
+            return `<div style="background:rgba(15,23,42,0.5);border:1px solid #334155;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+                <div style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">🔍 Key Findings — ${winner.label} wins (${winner.enc?.build_tag||''})</div>
+                ${pairHtml}
+            </div>`;
+        }
+
+        // ── Compare cross-build skill matrix ───────────────────────────────────
+        function renderCrossSkillMatrix(buildsData) {
+            const allSkills = new Set();
+            const buildMaps = {};
+            buildsData.forEach(b => {
+                const map = {}; buildMaps[b.label] = map;
+                const rot = b.bestEncounter?.first_60s?.rotation || [];
+                rot.forEach(h => {
+                    const sk=h.skill||'Unknown';
+                    if (!map[sk]) map[sk]={dmg:0,hits:0,crits:0,heavies:0,ch:0,times:[]};
+                    map[sk].dmg+=h.damage||0; map[sk].hits++;
+                    if(h.is_crit&&h.is_heavy) map[sk].ch++;
+                    else if(h.is_crit) map[sk].crits++;
+                    else if(h.is_heavy) map[sk].heavies++;
+                    map[sk].times.push(h.relative_time||0);
+                    allSkills.add(sk);
+                });
+            });
+            function casts(times){const s=[...times].sort((a,b)=>a-b);let c=1;for(let i=1;i<s.length;i++)if(s[i]-s[i-1]>0.15)c++;return c;}
+            const skillTotals = {};
+            allSkills.forEach(sk => {
+                buildsData.forEach(b => { const m=buildMaps[b.label][sk]; if(m) skillTotals[sk]=(skillTotals[sk]||0)+m.dmg; });
+            });
+            const sorted = [...allSkills].sort((a,b)=>(skillTotals[b]||0)-(skillTotals[a]||0));
+            const letters = buildsData.map(b=>b.label);
+
+            const headerCols = letters.map(l=>`<th style="color:#22d3ee;font-weight:700;font-size:0.7rem;padding:0 6px 7px;text-align:right;">${l}</th>`).join('');
+
+            const rows = sorted.map(sk => {
+                const vals = letters.map(l => {
+                    const m = buildMaps[l][sk];
+                    if (!m) return {dmg:0,c:0,avg:0,crit:0,heavy:0,ch:0};
+                    const c=casts(m.times);
+                    return {dmg:m.dmg,c,avg:m.dmg/c,crit:m.crits/m.hits*100,heavy:m.heavies/m.hits*100,ch:m.ch/m.hits*100};
+                });
+                const maxDmg = Math.max(...vals.map(v=>v.dmg));
+                const dmgCells = vals.map(v=>
+                    `<td style="text-align:right;font-size:0.77rem;padding:5px 6px;color:${v.dmg===maxDmg&&maxDmg>0?'#22c55e':'#94a3b8'};font-variant-numeric:tabular-nums;">${v.dmg>0?formatNumber(v.dmg):'—'}</td>`
+                ).join('');
+                const castCells = vals.map(v=>
+                    `<td style="text-align:right;font-size:0.77rem;padding:5px 6px;color:#64748b;font-variant-numeric:tabular-nums;">${v.c||'—'}</td>`
+                ).join('');
+                const avgCells = vals.map(v=>
+                    `<td style="text-align:right;font-size:0.77rem;padding:5px 6px;color:#64748b;font-variant-numeric:tabular-nums;">${v.avg>0?formatNumber(Math.round(v.avg)):'—'}</td>`
+                ).join('');
+                const chCells = vals.map(v=>
+                    `<td style="text-align:right;font-size:0.72rem;padding:5px 6px;color:#f472b6;font-variant-numeric:tabular-nums;">${v.ch>0?v.ch.toFixed(0)+'%':'—'}</td>`
+                ).join('');
+
+                return `<tr style="border-top:1px solid rgba(255,255,255,0.05);">
+                    <td style="font-size:0.77rem;color:#e2e8f0;padding:5px 8px;display:flex;align-items:center;gap:5px;">
+                        <div style="width:6px;height:6px;border-radius:50%;background:${skillColor(sk)};flex-shrink:0;"></div>${sk}
+                    </td>
+                    ${dmgCells}${castCells}${avgCells}${chCells}
+                </tr>`;
+            }).join('');
+
+            const subHeaderCols = ['DAMAGE','CASTS','AVG/CAST','C+H%'].map(h=>
+                letters.map(()=>`<th style="font-size:0.65rem;color:#475569;font-weight:400;padding:0 6px 5px;text-align:right;">${h}</th>`).join('')
+            ).join('');
+
+            return `<div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr><th style="font-size:0.7rem;color:#64748b;padding:0 8px 7px;text-align:left;">SKILL</th>${headerCols.repeat(4)}</tr>
+                        <tr><th></th>${subHeaderCols}</tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>`;
+        }
+
+        // ── Compare rotation chart toggle functions ────────────────────────────
+        let compareRotationData = {}; // stores rotation per build for refresh
+
+        function toggleCompareRotationSkill(build, skill) {
+            const map = {A:compareHiddenSkillsA, B:compareHiddenSkillsB, C:compareHiddenSkillsC};
+            const s = map[build];
+            if (!s) return;
+            if (s.has(skill)) s.delete(skill); else s.add(skill);
+            refreshCompareRotationChart(build);
+        }
+
+        function compareRotationShowAll(build) {
+            const map = {A:compareHiddenSkillsA, B:compareHiddenSkillsB, C:compareHiddenSkillsC};
+            const s = map[build]; if(s) s.clear();
+            refreshCompareRotationChart(build);
+        }
+
+        function refreshCompareRotationChart(build) {
+            const rot = compareRotationData[build];
+            if (!rot) return;
+            const map = {A:compareHiddenSkillsA, B:compareHiddenSkillsB, C:compareHiddenSkillsC};
+            renderStackedDpsChart(rot, 60, map[build],
+                `compareRotChart_${build}`, `compareRotYAxis_${build}`,
+                `compareRotToggles_${build}`, `compareRotLegend_${build}`,
+                `toggleCompareRotationSkill.bind(null,'${build}')`,
+                `compareRotationShowAll.bind(null,'${build}')`);
+        }
+
+        function stackedChartHideAll(toggleFn, skills) {
+            // Hide all skills by calling the toggle fn for each visible skill
+            if (toggleFn === 'toggleRotationSkill') {
+                skills.forEach(sk => rotationHiddenSkills.add(sk));
+                if (lastRotationCache) renderBTStackedChart(lastRotationCache.rotation);
+            } else if (toggleFn === 'toggleEncRotationSkill') {
+                skills.forEach(sk => encRotationHiddenSkills.add(sk));
+                if (lastEncRotationCache) renderEncStackedChart(lastEncRotationCache.rotation, lastEncRotationCache.duration);
+            }
+        }
+
+        function renderBTStackedChart(rotation) {
+            renderStackedDpsChart(rotation, 60, rotationHiddenSkills,
+                'rotationDpsChart','rotationYAxis','rotationSkillToggles','rotationSkillLegend',
+                'toggleRotationSkill','rotationShowAll');
+        }
+
+        function renderEncStackedChart(rotation, duration) {
+            const maxSec = Math.min(Math.ceil(duration||60),120);
+            renderStackedDpsChart(rotation, maxSec, encRotationHiddenSkills,
+                'encRotationDpsChart','encRotationYAxis','encRotationSkillToggles','encRotationSkillLegend',
+                'toggleEncRotationSkill','encRotationShowAll');
+        }
+
+        function renderEncInsightsRich(data, rotation, duration) {
+            const container = document.getElementById('encRotationInsights');
+            if (!container || !rotation || !rotation.length) {
+                if (container) container.innerHTML = '<div style="color:#64748b;text-align:center;padding:20px;">No rotation data to analyze</div>';
+                return;
+            }
+            const insights = [];
+            const totalDamage=rotation.reduce((s,h)=>s+h.damage,0);
+            const totalHits=rotation.length;
+            const critRate=totalHits>0?rotation.filter(h=>h.is_crit).length/totalHits*100:0;
+            const heavyRate=totalHits>0?rotation.filter(h=>h.is_heavy).length/totalHits*100:0;
+            const chRate=totalHits>0?rotation.filter(h=>h.is_crit&&h.is_heavy).length/totalHits*100:0;
+
+            insights.push({type:chRate>=15?'success':chRate>=8?'warning':'neutral',icon:'⚡',
+                text:`Hit types: <span class="rotation-insight-value">${critRate.toFixed(0)}% Crit</span> · <span class="rotation-insight-value">${heavyRate.toFixed(0)}% Heavy</span> · <span class="rotation-insight-value" style="color:#f472b6">${chRate.toFixed(0)}% C+H</span>`});
+
+            const secDmg={}, hitTimes=rotation.map(h=>Math.floor(h.relative_time||0));
+            rotation.forEach(h=>{const s=Math.floor(h.relative_time||0);secDmg[s]=(secDmg[s]||0)+h.damage;});
+            const firstHit=Math.min(...hitTimes),lastHit=Math.max(...hitTimes);
+            const activeSecs=Object.keys(secDmg).filter(s=>parseInt(s)>=firstHit&&parseInt(s)<=lastHit).length;
+            const actRate=activeSecs/Math.max(1,lastHit-firstHit+1)*100;
+            if(actRate<70) insights.push({type:'danger',icon:'⏱️',text:`Low uptime: <span class="rotation-insight-value">${actRate.toFixed(0)}%</span>`});
+            else if(actRate<85) insights.push({type:'warning',icon:'⏱️',text:`Uptime <span class="rotation-insight-value">${actRate.toFixed(0)}%</span> — some gaps`});
+            else insights.push({type:'success',icon:'✔',text:`Solid uptime at <span class="rotation-insight-value">${actRate.toFixed(0)}%</span>`});
+
+            let peakDps=0,peakStart=0,maxSec=Math.ceil(duration||60);
+            for(let i=0;i<=maxSec-5;i++){let s=0;for(let j=i;j<i+5;j++)s+=secDmg[j]||0;if(s/5>peakDps){peakDps=s/5;peakStart=i;}}
+            if(peakDps>0) insights.push({type:'success',icon:'🔥',text:`Peak 5s burst: <span class="rotation-insight-value">${formatNumber(Math.round(peakDps))} DPS</span> at ${peakStart}–${peakStart+5}s`});
+
+            const skillDmg={};
+            rotation.forEach(h=>{const sk=h.skill||'Unknown';skillDmg[sk]=(skillDmg[sk]||0)+h.damage;});
+            const skillsByDmg=Object.entries(skillDmg).sort((a,b)=>b[1]-a[1]);
+            if(skillsByDmg.length>=3){
+                const top3=skillsByDmg.slice(0,3).reduce((s,[,d])=>s+d,0);
+                insights.push({type:'neutral',icon:'⚔️',text:`Top 3 skills — <span class="rotation-insight-value">${skillsByDmg[0][0]}, ${skillsByDmg[1][0]}, ${skillsByDmg[2][0]}</span> — <span class="rotation-insight-value">${totalDamage>0?(top3/totalDamage*100).toFixed(0):0}%</span> of damage`});
+            }
+
+            const skillHitsMap={};
+            rotation.forEach(h=>{const sk=h.skill||'Unknown';if(!skillHitsMap[sk])skillHitsMap[sk]=[];skillHitsMap[sk].push(h);});
+            skillsByDmg.slice(0,5).forEach(([sk])=>{
+                const hits=skillHitsMap[sk]||[];
+                const sorted=[...hits].sort((a,b)=>(a.relative_time||0)-(b.relative_time||0));
+                const casts=[];let cur=null;
+                sorted.forEach(h=>{const t=h.relative_time||0;if(!cur||t-cur.end>0.15){casts.push({start:t,end:t});cur=casts[casts.length-1];}else cur.end=t;});
+                if(casts.length<3)return;
+                const gaps=[];for(let i=1;i<casts.length;i++)gaps.push(casts[i].start-casts[i-1].start);
+                const avg=gaps.reduce((s,g)=>s+g,0)/gaps.length, mx=Math.max(...gaps);
+                if(mx>avg*1.6&&mx>8) insights.push({type:'warning',icon:'⏳',text:`<span class="rotation-insight-value">${sk}</span>: <span class="rotation-insight-value">${mx.toFixed(1)}s</span> gap (avg ${avg.toFixed(1)}s) — possible dropped cast`});
+            });
+
+            if(duration>120) insights.push({type:'info',icon:'⏱️',text:`Long encounter: <span class="rotation-insight-value">${formatDuration(duration)}</span> · avg <span class="rotation-insight-value">${formatNumber(Math.round(totalDamage/duration))} DPS</span>`});
+
+            container.innerHTML = insights.map(i=>
+                `<div class="rotation-insight ${i.type}"><span class="rotation-insight-icon">${i.icon}</span><span class="rotation-insight-text">${i.text}</span></div>`
+            ).join('') || '<div style="color:#64748b;text-align:center;padding:20px;">No significant issues detected</div>';
+        }
+
+        // ============================================================
+        // DEMO MODE — activates when backend is not running
+        // ============================================================
+        let demoModeActive = false;
+        let demoEncounterMap = {}; // target_name+start_time → full encounter data
+
+        // Seeded LCG random for consistent demo data
+        function demoRng(seed) {
+            let s = seed;
+            return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+        }
+
+        function generateOracleRotation(durationSec, seed) {
+            const rng = demoRng(seed || 42);
+            const SKILLS = [
+                { name:'Void Slash',         cadence:3.5,  subHits:5,  base:7500,  var:3000 },
+                { name:'Supernova Collapse', cadence:8.0,  subHits:6,  base:14000, var:5000 },
+                { name:'Curse Explosion',    cadence:6.1,  subHits:1,  base:48000, var:12000 },
+                { name:'Abyssal Burst',      cadence:7.0,  subHits:3,  base:11000, var:3500 },
+                { name:'Touch of Despair',   cadence:5.0,  subHits:2,  base:5500,  var:2000 },
+                { name:'Starcalling',        cadence:4.0,  subHits:4,  base:9500,  var:3000 },
+                { name:'Stellar Dash',       cadence:6.0,  subHits:3,  base:6500,  var:2000 },
+                { name:'Manaball',           cadence:2.5,  subHits:1,  base:3800,  var:1200 },
+            ];
+            const hits = [];
+            let id = 0;
+            SKILLS.forEach(sk => {
+                let t = rng() * sk.cadence;
+                while (t < durationSec) {
+                    for (let h = 0; h < sk.subHits; h++) {
+                        const isCrit  = rng() < 0.34;
+                        const isHeavy = rng() < 0.28;
+                        const isCH    = isCrit && isHeavy && rng() < 0.65;
+                        const base    = sk.base + (rng()*2-1)*sk.var;
+                        const dmg     = Math.round(base * (isCrit||isCH?1.5:1) * (isHeavy||isCH?2:1));
+                        hits.push({ id:id++, skill:sk.name, damage:Math.max(dmg,100),
+                            relative_time: t + h*0.08, is_crit:isCrit||isCH, is_heavy:isHeavy||isCH });
+                    }
+                    t += sk.cadence + (rng()*0.6-0.3);
+                }
+            });
+            return hits.sort((a,b)=>a.relative_time-b.relative_time);
+        }
+
+        function makeDemoEncounter(opts) {
+            const rot = generateOracleRotation(opts.duration, opts.seed);
+            const total = rot.reduce((s,h)=>s+h.damage,0);
+            const crits  = rot.filter(h=>h.is_crit).length;
+            const heavies = rot.filter(h=>h.is_heavy).length;
+            const ch     = rot.filter(h=>h.is_crit&&h.is_heavy).length;
+            const enc = {
+                id: opts.id,
+                target_name: opts.target,
+                category: opts.category || 'field_boss',
+                start_time: opts.start,
+                end_time: opts.end,
+                duration: opts.duration,
+                total_damage: total,
+                dps: total / opts.duration,
+                hit_count: rot.length,
+                crit_rate:  rot.length>0 ? crits/rot.length*100  : 0,
+                heavy_rate: rot.length>0 ? heavies/rot.length*100 : 0,
+                ch_rate:    rot.length>0 ? ch/rot.length*100       : 0,
+                build_tag: opts.tag || '',
+                player_class: 'Oracle',
+                notes: '',
+                merged: false,
+                hit_log: rot,
+                skills: Object.entries(rot.reduce((m,h)=>{m[h.skill]=(m[h.skill]||0)+h.damage;return m;},{}))
+                    .map(([name,damage])=>({ name, damage, hits:rot.filter(h=>h.skill===name).length }))
+            };
+            demoEncounterMap[enc.target_name + '|' + enc.start_time] = enc;
+            return enc;
+        }
+
+        function initDemoMode() {
+            if (demoModeActive) return;
+            demoModeActive = true;
+
+            // Status indicator
+            const dot  = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            if (dot)  { dot.style.background = '#f59e0b'; dot.classList.remove('connected'); }
+            if (text) text.innerHTML = 'Demo Mode <span style="font-size:0.65rem;color:#64748b;">— no backend</span>';
+
+            // License / version (already static, just ensure it renders)
+            updateLicenseInfo({});
+
+            // Build tags
+            buildTags = ['4pc Blood CDR','4pc Blood','2pc Veiled','4pc Veiled','Testing','Guild Raids','World Boss'];
+
+            // Weapon config so class detection works
+            if (!weaponConfig || !Object.keys(weaponConfig.skillAssignments||{}).length) {
+                weaponConfig = { skillAssignments: {
+                    'Void Slash':'orb','Supernova Collapse':'orb','Starcalling':'orb',
+                    'Stellar Dash':'orb','Interstellar Explosion':'orb','Star Destroyer':'orb',
+                    'Abyssal Burst':'wand','Curse Explosion':'wand','Touch of Despair':'wand',
+                    'Ray of Disaster':'wand','Manaball':'wand','Chaotic Shield':'wand'
+                }};
+            }
+
+            // === Build Testing — completed test ===
+            const rot60 = generateOracleRotation(60, 7);
+            const total60 = rot60.reduce((s,h)=>s+h.damage,0);
+            const hits60  = rot60.length;
+            const crits60 = rot60.filter(h=>h.is_crit).length;
+            const hvy60   = rot60.filter(h=>h.is_heavy).length;
+            const ch60    = rot60.filter(h=>h.is_crit&&h.is_heavy).length;
+            const dps60   = Math.round(total60/60);
+
+            buildTestComplete = true;
+            lastTestData = {
+                duration: 62, first_hit:'14:32:01', last_hit:'14:33:03',
+                first_60s: {
+                    dps: dps60, hit_count: hits60,
+                    raw_crit_rate:  (crits60/hits60*100),
+                    raw_heavy_rate: (hvy60/hits60*100),
+                    raw_ch_rate:    (ch60/hits60*100),
+                    rotation: rot60,
+                    skills: Object.entries(rot60.reduce((m,h)=>{m[h.skill]=(m[h.skill]||0)+h.damage;return m;},{}))
+                        .map(([name,damage])=>({ name, damage, hits:rot60.filter(h=>h.skill===name).length }))
+                }
+            };
+            selectedClass = 'Oracle';
+
+            const statsPanel = document.getElementById('buildTestStatsPanel');
+            const extStats   = document.getElementById('buildTestExtendedStats');
+            if (statsPanel) statsPanel.style.display = 'block';
+            if (extStats)   extStats.style.display   = 'grid';
+            document.getElementById('btDps').textContent     = dps60.toLocaleString();
+            document.getElementById('btHits').textContent    = hits60.toLocaleString();
+            document.getElementById('btCrit').textContent    = (crits60/hits60*100).toFixed(1)+'%';
+            document.getElementById('btHeavy').textContent   = (hvy60/hits60*100).toFixed(1)+'%';
+            document.getElementById('btNormal').textContent  = ((hits60-crits60-hvy60+ch60)/hits60*100).toFixed(1)+'%';
+            document.getElementById('btCritHeavy').textContent = (ch60/hits60*100).toFixed(1)+'%';
+            document.getElementById('btAvgHit').textContent  = Math.round(total60/hits60).toLocaleString();
+
+            const card = document.getElementById('activeTargetCard');
+            if (card) {
+                card.style.display = 'block';
+                card.style.borderColor = 'rgba(34,197,94,0.3)';
+                card.style.background  = 'rgba(34,197,94,0.05)';
+                card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-size:0.75rem;color:#22c55e;font-weight:600;">✓ Test Complete</div>
+                        <div style="font-size:1rem;color:#e2e8f0;font-weight:500;margin-top:4px;">Practice Dummy</div>
+                    </div>
+                    <div style="text-align:right;"><div style="font-size:0.7rem;color:#64748b;">60 seconds</div></div>
+                </div>`;
+            }
+
+            // Rotation chart
+            lastRotationCache = { rotation: rot60, gapStats: {} };
+            setTimeout(()=>renderBTStackedChart(rot60), 100);
+
+            // Performance insights
+            const gapStats = { deadTime:3, majorGaps:1, longestGap:4.2, avgGap:1.1, activityRate:94, peakDps:dps60*1.3 };
+            if (typeof updateRotation === 'function') {
+                try { updateRotation(rot60, gapStats); } catch(e) {}
+            }
+
+            // === Session Queue — 3 runs ===
+            const rotA = generateOracleRotation(60, 11);
+            const rotB = generateOracleRotation(60, 22);
+            const rotC = generateOracleRotation(60, 33);
+            const dpsA = Math.round(rotA.reduce((s,h)=>s+h.damage,0)/60);
+            const dpsB = Math.round(rotB.reduce((s,h)=>s+h.damage,0)/60);
+            const dpsC = Math.round(rotC.reduce((s,h)=>s+h.damage,0)/60);
+            const cr = r=>Math.round(r.filter(h=>h.is_crit).length/r.length*100*10)/10;
+            const hr = r=>Math.round(r.filter(h=>h.is_heavy).length/r.length*100*10)/10;
+            const chr= r=>Math.round(r.filter(h=>h.is_crit&&h.is_heavy).length/r.length*100*10)/10;
+
+            sessionQueue = [
+                { runNumber:1, tempTag:'__sq_demo1__', finalTag:'4pc Blood CDR', playerClass:'Oracle',
+                  dps:dpsA, critRate:cr(rotA), heavyRate:hr(rotA), critHeavyRate:chr(rotA),
+                  id:'__d1__', saved:false, runLabSlot:'A', rotation:rotA, skills:[], notes:'' },
+                { runNumber:2, tempTag:'__sq_demo2__', finalTag:'2pc Veiled',    playerClass:'Oracle',
+                  dps:dpsB, critRate:cr(rotB), heavyRate:hr(rotB), critHeavyRate:chr(rotB),
+                  id:'__d2__', saved:false, runLabSlot:'B', rotation:rotB, skills:[], notes:'' },
+                { runNumber:3, tempTag:'__sq_demo3__', finalTag:'',              playerClass:'Oracle',
+                  dps:dpsC, critRate:cr(rotC), heavyRate:hr(rotC), critHeavyRate:chr(rotC),
+                  id:null,   saved:false, runLabSlot:null, rotation:rotC, skills:[], notes:'' },
+            ];
+            sessionRunCounter = 3;
+            const qPanel = document.getElementById('sessionQueuePanel');
+            if (qPanel) qPanel.style.display = 'block';
+            renderSessionQueue();
+
+            // === Encounters tab ===
+            const demoEncs = [
+                makeDemoEncounter({ id:'de1', target:'Practice Dummy',      duration:62,  seed:101, tag:'4pc Blood CDR', start:'2026-04-08T14:32:00', end:'2026-04-08T14:33:02', category:'training' }),
+                makeDemoEncounter({ id:'de2', target:'Practice Dummy',      duration:65,  seed:102, tag:'2pc Veiled',    start:'2026-04-08T14:35:00', end:'2026-04-08T14:36:05', category:'training' }),
+                makeDemoEncounter({ id:'de3', target:'Ascended Grand Aelon',duration:126, seed:103, tag:'4pc Blood CDR', start:'2026-04-08T15:10:00', end:'2026-04-08T15:12:06', category:'field_boss' }),
+                makeDemoEncounter({ id:'de4', target:'Ascended Grand Aelon',duration:119, seed:104, tag:'4pc Blood CDR', start:'2026-04-08T15:13:30', end:'2026-04-08T15:15:29', category:'field_boss' }),
+                makeDemoEncounter({ id:'de5', target:'Ascended Malakar',    duration:173, seed:105, tag:'4pc Blood',     start:'2026-04-08T16:00:00', end:'2026-04-08T16:02:53', category:'field_boss' }),
+            ];
+            updateSessionEncountersList(demoEncs);
+
+            // === Saved Encounters tab ===
+            savedEncounters = demoEncs.map(e => ({
+                ...e,
+                build_tag: e.build_tag, player_class:'Oracle', notes:'',
+                crit_rate: e.crit_rate, heavy_rate: e.heavy_rate,
+            }));
+            updateSavedEncountersList();
+            updateBuildFilters();
+
+            // Intercept encounter detail requests in demo mode
+            const _origSelectSessionEncounter = window.selectSessionEncounter || selectSessionEncounter;
+            selectSessionEncounter = function(index) {
+                selectedSessionEncounter = index;
+                renderSessionEncountersList();
+                const enc = sessionEncounters[index];
+                if (!enc) return;
+                selectedEncounterCategory = enc.category;
+                mergedEncounterIndices = null;
+                renderSessionEncountersList();
+                const key = enc.target_name + '|' + enc.start_time;
+                const full = demoEncounterMap[key];
+                if (full) displayEncounterDetails(full);
+            };
+
+            console.log('[Demo] Demo mode initialized');
+        }
+
+        // Auto-activate demo mode if backend not connected after 2s
+        setTimeout(() => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                initDemoMode();
+            }
+        }, 2000);
+
         connect();
     </script>
+    <!-- Interactive Tour Overlay -->
+    <div id="tourOverlay" style="display:none; position:fixed; inset:0; z-index:9000; pointer-events:all;"
+         onwheel="event.preventDefault()" ontouchmove="event.preventDefault()">
+        <!-- Dark backdrop -->
+        <div id="tourBackdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.72);"></div>
+        <!-- Spotlight cutout -->
+        <div id="tourSpotlight" style="display:none; position:absolute; border-radius:8px;
+             box-shadow:0 0 0 9999px rgba(0,0,0,0.72); pointer-events:none; z-index:1;
+             transition: top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease;
+             outline: 2px solid rgba(167,139,250,0.8); outline-offset: 2px;"></div>
+        <!-- Tooltip card -->
+        <div id="tourTooltip" style="position:absolute; z-index:2; pointer-events:all;
+             width:320px; background:linear-gradient(135deg,#1e293b,#0f172a);
+             border:1px solid rgba(167,139,250,0.5); border-radius:14px;
+             box-shadow:0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(167,139,250,0.1);
+             padding:20px; transition: top 0.35s ease, left 0.35s ease;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div id="tourStepCounter" style="font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.8px; font-weight:700;"></div>
+                <button onclick="endTour()" style="background:none; border:none; color:#475569; cursor:pointer; font-size:1rem; padding:0; line-height:1;" title="Skip tour">✕</button>
+            </div>
+            <div id="tourStepIcon" style="font-size:2rem; margin-bottom:10px; text-align:center;"></div>
+            <div id="tourStepTitle" style="font-size:1rem; font-weight:700; color:#e2e8f0; margin-bottom:8px; text-align:center;"></div>
+            <div id="tourStepText" style="font-size:0.82rem; color:#94a3b8; line-height:1.6; text-align:center; margin-bottom:18px;"></div>
+            <!-- Progress dots -->
+            <div id="tourDots" style="display:flex; justify-content:center; gap:6px; margin-bottom:16px;"></div>
+            <!-- Navigation -->
+            <div style="display:flex; gap:8px;">
+                <button id="tourPrevBtn" onclick="prevTourStep()"
+                    style="flex:1; padding:9px; border-radius:8px; border:1px solid #334155;
+                           background:rgba(30,41,59,0.8); color:#94a3b8; cursor:pointer; font-size:0.8rem; font-weight:600;">
+                    ← Back
+                </button>
+                <button id="tourNextBtn" onclick="nextTourStep()"
+                    style="flex:2; padding:9px; border-radius:8px; border:none;
+                           background:linear-gradient(135deg,#7c3aed,#a78bfa); color:white;
+                           cursor:pointer; font-size:0.85rem; font-weight:700;">
+                    Next →
+                </button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
