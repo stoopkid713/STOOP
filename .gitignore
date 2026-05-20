@@ -1,3 +1,21 @@
-﻿encounters.json
+# Personal runtime data (use samples/encounters_sample.json for testing)
+encounters.json
 saved_runs.json
 config.json
+
+# Pyinstaller extraction artifacts
+*.exe_extracted/
+pyinstxtractor.py
+
+# Build outputs (PyInstaller, manual builds)
+/dist/
+/build/
+*.spec.bak
+
+# Historical archives (preserved in working tree, not in git)
+/archive/
+/data-archive/
+
+# Python
+__pycache__/
+*.pyc
