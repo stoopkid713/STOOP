@@ -4,9 +4,22 @@ A combat log analyzer for **Throne and Liberty** built on top of the original CK
 
 > **Note:** This is a private development fork. Original project by [mjb6967/CKdpsApp](https://github.com/mjb6967/CKdpsApp).
 
+For the full feature evolution see [CHANGELOG.md](CHANGELOG.md); for the
+backstory of this fork and its sibling project see [LINEAGE.md](LINEAGE.md).
+The current production state is tagged `state-current` on `main`.
+
 ---
 
 ## What's New in This Fork
+
+### 🔀 Compare — Cross-Skill Matrix & Key Findings *(added in state-current)*
+Side-by-side per-skill breakdown across two runs, plus auto-computed
+observations about what differs between them. Spot exactly which skills
+drove the delta.
+
+### ⚙️ Sidebar + Weapon-group toggles *(added in state-current)*
+Collapsible sidebar for navigation; filter the Weapons tab by weapon group
+to compare loadouts cleanly.
 
 ### 🔬 Run Lab
 A purpose-built comparison tool for back-to-back build testing sessions — no saving required.
@@ -163,6 +176,23 @@ Settings → Player Name → enter your character name.
 
 - Original project: **SirPHz** (Discord: SirPHz) — [mjb6967/CKdpsApp](https://github.com/mjb6967/CKdpsApp)
 - This fork: **stoopkid4529**
+
+---
+
+## Development notes
+
+- The Python backend (`server.pyc` inside `TL-DPS-Meter.exe`) is binary-only.
+  Source was lost early on and the `.pyc` is compiled with Python 3.14, which
+  no automated decompiler supports. The 28K-line disassembly in
+  [`server.disasm.txt`](server.disasm.txt) is the authoritative reference.
+  See [docs/disasm-notes.md](docs/disasm-notes.md) for context.
+- Frontend changes (`index.html`) are the practical path forward.
+- A real-data test fixture lives at [`samples/encounters_sample.json`](samples/encounters_sample.json)
+  — copy it to `encounters.json` in the working folder before launching to
+  load the sample session.
+- A sibling project, [TL-DPS-Auto](https://github.com/stoopkid713/TL-DPS-Auto),
+  explores a different "more automated" design philosophy. Separate codebase
+  — not a successor to this tool. Coexists on different ports.
 
 ---
 
