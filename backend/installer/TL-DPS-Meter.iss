@@ -51,6 +51,54 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// --- Maintenance: when already installed, re-running Setup offers repair/remove ---
+// Inno doesn't have an MSI-style maintenance mode; without this, re-launching the
+// installer just walks the install wizard again. Detect a prior install (the _is1
+// uninstall key for our AppId, per-user HKCU or elevated HKLM) and offer the user
+// a clear choice up front: reinstall/repair, uninstall, or cancel.
+const
+  UNINST_KEY = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{7E9C2A14-3D5B-4F86-A1C7-9B0E2F4D6A88}_is1';
+
+function GetUninstallString(): String;
+begin
+  Result := '';
+  if not RegQueryStringValue(HKCU, UNINST_KEY, 'UninstallString', Result) then
+    RegQueryStringValue(HKLM, UNINST_KEY, 'UninstallString', Result);
+end;
+
+function RunExistingUninstaller(): Boolean;
+var
+  s: String;
+  code: Integer;
+begin
+  s := RemoveQuotes(GetUninstallString());
+  Result := (s <> '') and
+            Exec(s, '/SILENT /NORESTART /SUPPRESSMSGBOXES', '', SW_HIDE,
+                 ewWaitUntilTerminated, code);
+end;
+
+function InitializeSetup(): Boolean;
+var
+  choice: Integer;
+begin
+  Result := True;
+  if GetUninstallString() <> '' then
+  begin
+    choice := MsgBox(
+      'TL DPS Meter is already installed. What would you like to do?' + #13#10#13#10 +
+      'Yes' + #9 + '— Reinstall / repair (removes the old copy first)' + #13#10 +
+      'No' + #9 + '— Uninstall it and exit' + #13#10 +
+      'Cancel' + #9 + '— Do nothing',
+      mbConfirmation, MB_YESNOCANCEL);
+    case choice of
+      IDYES: RunExistingUninstaller();           // remove old, then continue (repair)
+      IDNO:  begin RunExistingUninstaller(); Result := False; end;  // remove + exit
+    else
+      Result := False;                           // cancel: leave everything as-is
+    end;
+  end;
+end;
+
 // On uninstall, offer to also remove the per-user data folder
 // (%LOCALAPPDATA%\TL-DPS-Meter: saved encounters, runs, settings, log).
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
