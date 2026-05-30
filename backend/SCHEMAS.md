@@ -85,9 +85,10 @@ Weapon values are lowercase: `spear`, `wand`, `bow`, `staff`, `dagger`, `crossbo
 ### `target_assignments.json` — user overrides (name→category)
 `{ assignments: { "<TargetName>": "<category>", ... }, last_updated:str }`
 
-### `saved_runs.json` — empty `[]` live; item schema inferred from `save_run` payload
-`{ runs: [ { id, run_name, dungeon_category, dungeon_name, dungeon_info, player_class, build_tag, contribution_percent:num|null, got_loot:bool, loot_item:str|null, encounters:[], stats:{} } ], last_updated }`
-> UNVERIFIED: whether root is `{runs:[...]}` or bare `[]`. Confirm during Phase 2/3.
+### `saved_runs.json` — **[RESOLVED Phase 2: root is a BARE LIST, no wrapper, no `last_updated`]**
+On disk: `[ { id, run_name, dungeon_category, dungeon_name, dungeon_info, player_class, build_tag, contribution_percent:num|null, got_loot:bool, loot_item:str|null, encounters:[], stats:{}, created_at } ... ]`
+Written with `indent=2`. The `{ runs:[...] }` envelope is **WS-broadcast-only** (`{type:"saved_runs_list", runs}`), never on disk.
+> Confirmed 3 ways: live file `[]`; `get_saved_runs` → `runs=json.load(f)` used directly (disasm L17860); `save_run` → `runs.append(new_run)` + `json.dump(runs,f,indent=2)` (disasm L17492). Item is `BUILD_MAP 13` (the 13 keys above).
 
 ---
 
