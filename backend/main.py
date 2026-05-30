@@ -22,10 +22,12 @@ classic invisible-until-packaged trap —
 * ``index.html`` is a BUNDLED read-only asset. In the frozen app PyInstaller
   extracts it under ``sys._MEIPASS``; in dev it lives at ``<repo>/index.html``.
   :func:`resolve_index_html` returns the right one.
-* The 8 user JSON files are WRITABLE state and must persist NEXT TO the exe so the
-  user can see them — ``APP_DIR = Path(sys.executable).parent`` when frozen, NOT
-  ``_MEIPASS`` (a temp dir wiped on exit). :func:`resolve_data_dir` returns that
-  (``$TLDPS_DATA_DIR`` still overrides; dev keeps the CWD default).
+* The 8 user JSON files are WRITABLE state. Where they persist depends on the
+  package: the PORTABLE build (marker beside the exe) keeps them NEXT TO the exe
+  so the folder is USB-movable; the INSTALLER build keeps them under
+  ``%LOCALAPPDATA%\\TL-DPS-Meter`` (the install location is read-only). Never
+  ``_MEIPASS`` (a temp dir wiped on exit). :func:`app_dir` / :func:`resolve_data_dir`
+  return the right one (``$TLDPS_DATA_DIR`` still overrides; dev keeps the CWD default).
 
 Because the windowed build runs with ``console=False`` (stdout is discarded),
 :func:`setup_logging` routes diagnostics to a rotating JSON-lines file next to the
@@ -52,22 +54,44 @@ log = logging.getLogger("tldps.main")
 # --- packaging-aware path resolution ---------------------------------------
 APP_NAME = "TL-DPS-Meter"
 
+# Sentinel that distinguishes the two production packages. Both ship the SAME
+# onefile exe; the PORTABLE zip ALSO ships this empty marker next to the exe, the
+# installer does not. Its presence flips data + log storage from the per-user
+# %LOCALAPPDATA% dir (installed convention) to NEXT TO THE EXE (old-style, fully
+# portable — the whole folder travels on a USB stick).
+PORTABLE_MARKER = "TL-DPS-Meter.portable"
+
 
 def _is_frozen() -> bool:
     """True when running inside a PyInstaller-frozen build."""
     return bool(getattr(sys, "frozen", False))
 
 
+def _is_portable() -> bool:
+    """True when the frozen build is the PORTABLE package (marker next to the exe)."""
+    if not _is_frozen():
+        return False
+    return (Path(sys.executable).resolve().parent / PORTABLE_MARKER).is_file()
+
+
 def app_dir() -> Path:
     """Directory that holds WRITABLE state (the 8 user JSON files + rotating log).
 
-    Frozen: a per-user dir under ``%LOCALAPPDATA%\\TL-DPS-Meter`` (created if
-    missing), so the app works even when installed to a read-only location like
-    Program Files. NOT ``sys.executable``'s parent (read-only under an installer)
-    and NOT ``sys._MEIPASS`` (the temp extract dir, wiped on exit). Dev: the repo
-    root (this file is ``<repo>/backend/main.py``).
+    Three resolutions:
+
+    * **Frozen + portable** (marker beside the exe): the exe's own folder, so the
+      JSON state + log live alongside it and the whole thing is USB-movable —
+      matches how the original tool felt. The folder is already writable (it's an
+      unzipped portable build), so no fallback is needed.
+    * **Frozen + installed** (no marker): a per-user dir under
+      ``%LOCALAPPDATA%\\TL-DPS-Meter`` (created if missing), so the app works even
+      when installed to a read-only location like Program Files. NOT
+      ``sys._MEIPASS`` (the temp extract dir, wiped on exit).
+    * **Dev**: the repo root (this file is ``<repo>/backend/main.py``).
     """
     if _is_frozen():
+        if _is_portable():
+            return Path(sys.executable).resolve().parent
         base = os.environ.get("LOCALAPPDATA") or str(Path.home())
         d = Path(base) / APP_NAME
         d.mkdir(parents=True, exist_ok=True)

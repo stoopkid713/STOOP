@@ -71,6 +71,55 @@ def test_dev_env_override(monkeypatch, tmp_path):
     assert main_mod.resolve_data_dir() == tmp_path
 
 
+# --- portable vs installed (the two production packages) --------------------
+def _make_portable_exe(tmp_path) -> Path:
+    """A frozen exe folder that carries the portable marker beside the exe."""
+    exe_dir = tmp_path / "portable" / "TL-DPS-Meter"
+    exe_dir.mkdir(parents=True)
+    (exe_dir / main_mod.PORTABLE_MARKER).write_text("", encoding="utf-8")
+    return exe_dir / "TL-DPS-Meter.exe"
+
+
+def test_is_portable_only_with_marker(monkeypatch, tmp_path):
+    meipass = tmp_path / "_MEI"
+    # marker present -> portable
+    exe = _make_portable_exe(tmp_path)
+    _freeze(monkeypatch, exe, meipass)
+    assert main_mod._is_portable() is True
+    # marker absent -> installed
+    exe2 = tmp_path / "installed" / "TL-DPS-Meter.exe"
+    exe2.parent.mkdir(parents=True)
+    _freeze(monkeypatch, exe2, meipass)
+    assert main_mod._is_portable() is False
+    # never portable in dev, even if a marker happens to sit beside the cwd
+    monkeypatch.setattr(main_mod.sys, "frozen", False, raising=False)
+    assert main_mod._is_portable() is False
+
+
+def test_portable_data_dir_is_exe_parent(monkeypatch, tmp_path):
+    exe = _make_portable_exe(tmp_path)
+    meipass = tmp_path / "_MEI"
+    local = tmp_path / "LocalAppData"
+    _freeze(monkeypatch, exe, meipass)
+    monkeypatch.delenv("TLDPS_DATA_DIR", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+
+    # portable -> data lives NEXT TO the exe (USB-movable), not LOCALAPPDATA/_MEIPASS
+    assert main_mod.app_dir() == exe.parent
+    assert main_mod.resolve_data_dir() == exe.parent
+    assert main_mod.resolve_data_dir() != meipass
+    assert main_mod.resolve_data_dir() != local / main_mod.APP_NAME
+
+
+def test_portable_env_override_still_wins(monkeypatch, tmp_path):
+    exe = _make_portable_exe(tmp_path)
+    meipass = tmp_path / "_MEI"
+    override = tmp_path / "custom_state"
+    _freeze(monkeypatch, exe, meipass)
+    monkeypatch.setenv("TLDPS_DATA_DIR", str(override))
+    assert main_mod.resolve_data_dir() == override
+
+
 # --- first-run preset seeding ----------------------------------------------
 def _bundle_with_presets(tmp_path) -> Path:
     meipass = tmp_path / "_MEI"

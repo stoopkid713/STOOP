@@ -3,7 +3,13 @@
 
 Run from backend/:  uv run python build.py [--no-installer]
 Outputs:            backend/dist/TL-DPS-Meter.exe
-                    backend/dist/TL-DPS-Meter-Setup.exe   (if Inno Setup is present)
+                    backend/dist/TL-DPS-Meter-portable.zip          (exe + portable marker)
+                    backend/dist/TL-DPS-Meter-Setup.exe             (if Inno Setup is present)
+
+The two production packages share ONE onefile exe. The portable zip also ships an
+empty ``TL-DPS-Meter.portable`` marker next to the exe; main.app_dir() sees it and
+keeps JSON state + log beside the exe (USB-movable). The installer omits the marker,
+so the installed app stores state under %LOCALAPPDATA%.
 
 The OLD repo-root TL-DPS-Meter.exe (the parity oracle) is NEVER touched — this only
 writes under backend/dist/ and backend/build/. The previous exe is kept as
@@ -24,6 +30,7 @@ import os
 import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 from typing import Optional
 
@@ -35,6 +42,9 @@ BUILD = HERE / "build"
 EXE = DIST / "TL-DPS-Meter.exe"
 PREV = DIST / "TL-DPS-Meter.prev.exe"
 SETUP = DIST / "TL-DPS-Meter-Setup.exe"
+PORTABLE_ZIP = DIST / "TL-DPS-Meter-portable.zip"
+PORTABLE_MARKER = "TL-DPS-Meter.portable"  # must match main.PORTABLE_MARKER
+HOWTO = HERE.parent / "HOW-TO-USE.txt"
 
 
 def build_exe() -> int:
@@ -63,6 +73,22 @@ def build_exe() -> int:
         return 1
 
     print(f"BUILD OK -> {EXE} ({EXE.stat().st_size / 1_000_000:.1f} MB)")
+    return 0
+
+
+def build_portable_zip() -> int:
+    """Bundle the PORTABLE package: the onefile exe + the empty ``.portable`` marker
+    (+ HOW-TO-USE.txt if present). The marker is what makes the portable build keep
+    its data next to the exe. Non-fatal: skips if the exe is missing."""
+    if not EXE.is_file():
+        print(f"exe not found — skipping portable zip: {EXE}", file=sys.stderr)
+        return 0
+    with zipfile.ZipFile(PORTABLE_ZIP, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.write(EXE, EXE.name)
+        if HOWTO.is_file():
+            zf.write(HOWTO, HOWTO.name)
+        zf.writestr(PORTABLE_MARKER, "")  # empty sentinel -> data lives beside the exe
+    print(f"PORTABLE OK -> {PORTABLE_ZIP} ({PORTABLE_ZIP.stat().st_size / 1_000_000:.1f} MB)")
     return 0
 
 
@@ -105,6 +131,9 @@ def build_installer() -> int:
 
 def main(argv: list[str]) -> int:
     rc = build_exe()
+    if rc != 0:
+        return rc
+    rc = build_portable_zip()
     if rc != 0:
         return rc
     if "--no-installer" in argv:
