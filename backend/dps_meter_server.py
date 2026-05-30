@@ -294,6 +294,22 @@ class DPSMeterServer:
             self._loop.call_soon_threadsafe(
                 lambda: asyncio.ensure_future(self._broadcast(self._stats_envelope())))
 
+    async def trigger_reset(self) -> None:
+        """Reset stats and broadcast the reset + a zeroed stats frame to all clients.
+
+        Shared by the hotkey path (Phase 5). The `reset` COMMAND replies to its
+        single requester then broadcasts the zeroed frame; this broadcasts the
+        `reset` signal to everyone (there is no requester for a hotkey press).
+        """
+        self.stats.reset()
+        await self._broadcast({"type": "reset"})
+        await self._broadcast(self._stats_envelope())
+
+    def request_reset(self) -> None:
+        """Thread-safe reset trigger — called from the hotkey listener thread."""
+        if self._loop is not None:
+            asyncio.run_coroutine_threadsafe(self.trigger_reset(), self._loop)
+
 
 # ===========================================================================
 # Command handlers. Each takes (server, msg) and returns a response dict or None.
@@ -746,9 +762,21 @@ async def _run_app(data_dir: str) -> None:
 
     watcher = LogWatcher(server)
     watcher.start()
+
+    # Global reset hotkey (Phase 5). Skip when disabled in config.
+    hotkeys = None
+    if server.config.get("hotkey_enabled", True):
+        from hotkey import HotkeyManager
+
+        hotkeys = HotkeyManager(server.request_reset,
+                                hotkey=server.config.get("hotkey", "ctrl+tab"))
+        hotkeys.start()
+
     try:
         await asyncio.Future()  # run until cancelled
     finally:
+        if hotkeys is not None:
+            hotkeys.stop()
         watcher.stop()
         await server.stop()
 
