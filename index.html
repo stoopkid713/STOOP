@@ -19457,7 +19457,16 @@ ${attemptLine}
             
             // Recalculate breakdown from current stats (client-side)
             recalculateWeaponBreakdown();
-            
+
+            // recalculateWeaponBreakdown() bails before rendering when there are
+            // no live stats yet (fresh launch / between fights). The weapon-card
+            // counts + assignment list derive only from skillAssignments, not from
+            // stats — so render them now regardless, else a fresh launch shows
+            // empty weapon cards even though the preset assigns 67 skills.
+            if (!currentStats) {
+                updateSkillAssignments(true);
+            }
+
             // Update data health counts
             updateDataHealthCounts();
         }
