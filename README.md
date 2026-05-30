@@ -23,11 +23,12 @@ Two ways to get it — pick one:
 | Your data lives | `%LOCALAPPDATA%\TL-DPS-Meter` | **next to the exe** (USB-movable) |
 | Best for | "set it and forget it" | a portable / USB setup, or trying it out |
 
-**[⬇ Latest release →](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest)**
+- **[⬇ Download the Installer — `TL-DPS-Meter-Setup.exe`](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest/download/TL-DPS-Meter-Setup.exe)**
+  — run it, then launch from the Start Menu.
+- **[⬇ Download the Portable zip — `TL-DPS-Meter-portable.zip`](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest/download/TL-DPS-Meter-portable.zip)**
+  — unzip anywhere (keep the files together), double-click `TL-DPS-Meter.exe`. The app *is* the window — no browser tab.
 
-- **Installer:** download `TL-DPS-Meter-Setup.exe`, run it, launch from the Start Menu.
-- **Portable:** download `TL-DPS-Meter-portable.zip`, unzip anywhere (keep the files
-  together), double-click `TL-DPS-Meter.exe`. The app *is* the window — no browser tab.
+*(Or browse [all releases](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest).)*
 
 **Windows 10/11.** First launch shows a SmartScreen "unknown publisher" warning
 (unsigned build) — click **More info → Run anyway**.
