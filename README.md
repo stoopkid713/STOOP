@@ -12,7 +12,7 @@ The current production state is tagged `state-current` on `main`.
 
 ## ⬇️ Download & Run
 
-1. **[Download the latest release](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest)** — grab `TL-DPS-Meter-v*.zip`
+1. **[⬇ Download TL-DPS-Meter.zip](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest/download/TL-DPS-Meter.zip)** — one click, downloads instantly
 2. **Unzip** the folder anywhere (keep all the files together)
 3. Double-click **`TL-DPS-Meter.exe`** — your browser opens automatically, that window **is** the meter
 4. In Throne & Liberty, turn on Combat Logging *(Settings → Shortcuts → Ring Menu → add **"Combat Meter"**)* and activate it from the Ring Menu
@@ -116,7 +116,7 @@ Between-run workflow built into Build Testing so you never lose a run:
 
 ## Installation
 
-1. **[Download the latest release](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest)** — `TL-DPS-Meter-v*.zip`
+1. **[⬇ Download TL-DPS-Meter.zip](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest/download/TL-DPS-Meter.zip)** — direct download, always the latest version
 2. Extract the zip to any folder (keep every file together — the exe, `index.html`, and the JSONs all live side by side)
 3. Double-click `TL-DPS-Meter.exe`
 4. Browser opens automatically
