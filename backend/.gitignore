@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+# Generated fixtures (regenerate via tools/build_sample_fixture.py)
+fixtures/sample_*.json
+fixtures/_*.json
+# Captured golden fixtures from the old .exe are committed when created (gold_*).
