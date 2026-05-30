@@ -1,0 +1,18 @@
+[project]
+name = "tl-dps-meter-backend"
+version = "0.1.0"
+description = "TL-DPS-Meter backend (clean rebuild) — combat-log parser, stats core, WebSocket server"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Make the backend modules and the parity harness importable from tests.
+pythonpath = [".", "tools"]
+addopts = "-q"

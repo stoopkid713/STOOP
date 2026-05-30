@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+.venv/
+.pytest_cache/
 # Generated fixtures (regenerate via tools/build_sample_fixture.py)
 fixtures/sample_*.json
 fixtures/_*.json
