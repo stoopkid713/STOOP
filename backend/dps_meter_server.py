@@ -737,13 +737,28 @@ def _segment_file(lines, assignments: dict) -> list[dict]:
     return segments
 
 
+async def _run_app(data_dir: str) -> None:
+    server = DPSMeterServer(data_dir, host=HOST, port=PORT)
+    await server.start()
+    # Tail the combat log into the server (Phase 4). Import here so the server
+    # module has no hard dependency on watchdog when used headless (e.g. tests).
+    from log_watcher import LogWatcher
+
+    watcher = LogWatcher(server)
+    watcher.start()
+    try:
+        await asyncio.Future()  # run until cancelled
+    finally:
+        watcher.stop()
+        await server.stop()
+
+
 def main() -> None:
     import os
 
     logging.basicConfig(level=logging.INFO)
     data_dir = os.environ.get("TLDPS_DATA_DIR", str(Path.cwd()))
-    server = DPSMeterServer(data_dir, host=HOST, port=PORT)
-    asyncio.run(server.serve_forever())
+    asyncio.run(_run_app(data_dir))
 
 
 if __name__ == "__main__":
