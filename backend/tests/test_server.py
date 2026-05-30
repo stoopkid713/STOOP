@@ -26,10 +26,18 @@ from compare_snapshots import diffs, norm
 from dps_meter_server import DPSMeterServer
 
 FIX = pathlib.Path(__file__).resolve().parent.parent / "fixtures"
-GOLD_INITS = json.loads((FIX / "gold_init_responses.json").read_text(encoding="utf-8"))
+# The gold_* parity fixtures (captured from the old .exe + a real combat log) live
+# in the private oracle, not the public repo. Skip the parity suite when absent;
+# copy oracle/fixtures/gold_* into backend/fixtures to run it locally.
+_HAVE_GOLD = (FIX / "gold_init_responses.json").is_file() and (FIX / "gold_stats_stream.jsonl").is_file()
+pytestmark = pytest.mark.skipif(
+    not _HAVE_GOLD,
+    reason="parity fixtures (gold_*) are in the private oracle; copy them into backend/fixtures to run",
+)
+GOLD_INITS = json.loads((FIX / "gold_init_responses.json").read_text(encoding="utf-8")) if _HAVE_GOLD else {}
 GOLD_COMBAT = FIX / "gold_combat.log"
-GOLD_STREAM = [json.loads(line) for line in (FIX / "gold_stats_stream.jsonl").open(encoding="utf-8")]
-GOLD_STATS_DATA = GOLD_STREAM[-1]["data"]  # converged broadcast
+GOLD_STREAM = [json.loads(line) for line in (FIX / "gold_stats_stream.jsonl").open(encoding="utf-8")] if _HAVE_GOLD else []
+GOLD_STATS_DATA = GOLD_STREAM[-1]["data"] if GOLD_STREAM else {}  # converged broadcast
 
 INIT_COMMANDS = [
     ("get_config", "config"),

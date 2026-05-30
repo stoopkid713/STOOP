@@ -1,10 +1,33 @@
 # Changelog
 
-All notable changes to this fork are documented here. Format loosely based on
+All notable changes are documented here. Format loosely based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-States are tagged in git as `state-<name>` and can be inspected with
-`git checkout state-<name>` or `git diff state-runlab state-current`.
+---
+
+## [1.0.0] - 2026-05-30
+
+First public release as an owned product.
+
+### Added
+- **Rebuilt backend** — the lost-source compiled backend was reimplemented from
+  scratch as fresh, owned Python (`backend/`) behind the same WebSocket contract,
+  with a full pytest suite.
+- **Single native window** — the app now runs in one pywebview window instead of a
+  server-plus-browser-tab.
+- **Two packages** — a per-user **installer** (`TL-DPS-Meter-Setup.exe`, Start Menu +
+  uninstaller, data in `%LOCALAPPDATA%`) and a true-portable **zip**
+  (`TL-DPS-Meter-portable.zip`, data stored next to the exe, USB-movable).
+- **First-run presets** + in-app data controls (reveal data folder, reset fight data).
+- MIT [LICENSE](LICENSE) + upstream [NOTICE](NOTICE).
+
+### Changed
+- Installer offers reinstall/repair/uninstall when already installed.
+
+### Notes
+- The earlier fork's frontend features (below) are preserved. The original
+  reverse-engineering material (the old binaries, disassembly, and capture fixtures)
+  is kept privately, out of this repo.
 
 ---
 
@@ -72,11 +95,9 @@ Initial fork from [mjb6967/CKdpsApp](https://github.com/mjb6967/CKdpsApp) by Sir
 
 ## Lineage notes
 
-Earlier states (`state-baseline`, `state-session-queue`, `state-runlab`) are
-preserved as orphan-branch commits — they're not part of `main`'s linear
-history but are reachable via their tags. The `archive/` directory in the
-working tree mirrors these same states folder-by-folder for offline
-inspection. See [LINEAGE.md](LINEAGE.md) for the full narrative.
+The pre-1.0 fork states above (`state-baseline` → `state-current`) and the
+original reverse-engineering material are preserved privately, outside this
+public repo. See [LINEAGE.md](LINEAGE.md) for the full narrative.
 
 The sibling project [TL-DPS-Auto](https://github.com/stoopkid713/TL-DPS-Auto)
 is a separate codebase — not a successor to this tool.

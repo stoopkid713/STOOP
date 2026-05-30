@@ -1,13 +1,18 @@
-TL DPS Meter — StoopKid Beta
+ツCKヤ DPS Meter
 =============================
 
 Quick Start:
 1. Double-click TL-DPS-Meter.exe
-2. Browser opens automatically
+2. A native window opens — that window IS the meter (no browser tab)
 3. Play TL with combat logging enabled
 4. Press Ctrl+Tab anytime to reset encounter (works in-game)
 
+This portable build keeps its data (settings, encounters, log) right here in
+this folder — move the whole folder anywhere, even a USB stick, and it keeps
+working. (The installer build instead stores data in %LOCALAPPDATA%\TL-DPS-Meter.)
+
 First Run:
+- The app seeds its presets automatically; your fight data starts empty
 - Go to Settings and verify your log path
 - Default: %LOCALAPPDATA%\TL\Saved\CombatLogs
 
@@ -43,7 +48,7 @@ Global Hotkey:
 - Change in Settings if needed
 
 Troubleshooting:
-- "Disconnected" in browser → make sure TL-DPS-Meter.exe is running
+- "Disconnected" in the window → make sure TL-DPS-Meter.exe is running
 - No data → combat logging must be enabled in-game
 - Hotkey conflict → change it in Settings
 - Stats appear blank mid-fight → normal, TL writes logs after combat ends

@@ -5,9 +5,10 @@ __pycache__/
 # Generated fixtures (regenerate via tools/build_sample_fixture.py)
 fixtures/sample_*.json
 fixtures/_*.json
-# Captured golden fixtures from the old .exe are committed when created (gold_*).
-# Isolated sandbox used to drive the old .exe during oracle capture (Phase 3).
-.oracle_tmp/
+# Parity fixtures captured from the old .exe live in the private oracle, NOT here.
+# Copy oracle/fixtures/gold_* into fixtures/ to run the parity suite locally; the
+# tests skip when absent. Ignored so a local copy never gets committed.
+fixtures/gold_*
 # PyInstaller build outputs (Phase 8) — exe + work dir are artifacts, never tracked.
 # (root .gitignore only anchors the repo-root /dist/, not backend/dist/.)
 dist/

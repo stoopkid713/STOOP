@@ -14,6 +14,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 import encounter_scan
 import persistence as p
 
@@ -21,6 +23,12 @@ BACKEND = Path(__file__).resolve().parents[1]
 REPO = BACKEND.parent
 FIX = BACKEND / "fixtures"
 GOLD_LOG = FIX / "gold_combat.log"
+# gold_* parity fixtures live in the private oracle (captured from the old .exe).
+# Skip when absent; copy oracle/fixtures/gold_* into backend/fixtures to run.
+pytestmark = pytest.mark.skipif(
+    not (GOLD_LOG.is_file() and (FIX / "gold_init_responses.json").is_file()),
+    reason="parity fixtures (gold_*) are in the private oracle; copy them into backend/fixtures to run",
+)
 
 
 def _merged_assignments() -> dict:

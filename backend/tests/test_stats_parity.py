@@ -12,11 +12,20 @@ floats, sort name-keyed lists) so this test and ``compare_snapshots.py`` agree.
 import json
 import os
 
+import pytest
+
 from combat_stats import build_first_60s_block
 from compare_snapshots import diffs, norm
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIX = os.path.join(BACKEND, "fixtures")
+# sample_input_hits.json / sample_expected.json are generated (gitignored) from
+# samples/encounters_sample.json via tools/build_sample_fixture.py. Skip when absent
+# (fresh clone); run `python tools/build_sample_fixture.py` to regenerate them.
+pytestmark = pytest.mark.skipif(
+    not os.path.isfile(os.path.join(FIX, "sample_input_hits.json")),
+    reason="sample fixtures absent; regenerate via tools/build_sample_fixture.py",
+)
 
 
 def _load(name):

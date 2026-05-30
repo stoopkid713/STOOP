@@ -1,0 +1,12 @@
+ツCKヤ DPS Meter
+Copyright (c) 2026 stoopkid4529
+
+This product builds on the original concept and design of CKdpsApp by SirPHz
+(https://github.com/mjb6967/CKdpsApp), a combat-log DPS meter for Throne and
+Liberty. The frontend began as a fork of that project; the backend in this
+repository is an independent, clean reimplementation behind the same local
+WebSocket contract.
+
+Throne and Liberty is a trademark of its respective owners. This is an
+unofficial, fan-made tool and is not affiliated with or endorsed by the game's
+publisher or developer.
