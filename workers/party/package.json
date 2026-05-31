@@ -1,0 +1,11 @@
+{
+  "name": "tldps-party",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Durable Object party relay for TL-DPS-Meter (post-combat boss scoreboard).",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run"
+  }
+}

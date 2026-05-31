@@ -1,0 +1,23 @@
+# tldps-party — Cloudflare Durable Object party relay for TL-DPS-Meter.
+# One PartyRoom Durable Object instance per party code = the authoritative room.
+#
+# Deploy: `wrangler deploy` (needs a CF API token — see README "Bootstrap").
+# Local:  `wrangler dev`   (runs the DO in miniflare locally, no account needed).
+
+name = "tldps-party"
+main = "src/index.js"
+compatibility_date = "2026-05-01"
+
+[observability]
+enabled = true
+
+# Durable Object binding. The PartyRoom class is the per-party room.
+[[durable_objects.bindings]]
+name = "PARTY_ROOM"
+class_name = "PartyRoom"
+
+# SQLite-backed storage class. SQLite-backed DOs are intended to be available on
+# the Workers FREE plan — verify before assuming the $5/mo Paid plan is required.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PartyRoom"]
