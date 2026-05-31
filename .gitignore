@@ -24,6 +24,9 @@ pyinstxtractor.py
 __pycache__/
 *.pyc
 
+# Game-data refresh tool: raw questlog pull cache (regenerated on demand)
+backend/tools/_refresh_cache/
+
 # Local tooling (Claude Code preview config, etc.) — not shipped
 .claude/
 
