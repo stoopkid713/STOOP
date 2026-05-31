@@ -10636,6 +10636,11 @@
                                         <input type="text" id="partyUsernameInput" class="party-setup-input" placeholder="Enter your name..." maxlength="20">
                                         <button class="party-setup-btn-save" onclick="setPartyUsername()">Save</button>
                                     </div>
+                                    <!-- B1: one-tap default name(s) from the combat log (F4 get_suggested_names) -->
+                                    <div id="partyNameSuggestions" style="display:none; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                                        <span style="font-size:11px; opacity:0.6;">Detected:</span>
+                                        <span id="partyNameChips"></span>
+                                    </div>
                                     <div class="party-setup-name-tag" id="partyNameTag" style="display: none;">
                                         <span class="party-name-value" id="partyUsernameValue">-</span>
                                         <button class="party-name-edit" onclick="editPartyUsername()">✏️</button>
@@ -22198,6 +22203,7 @@ ${attemptLine}
                 sendCommand('get_default_targets');
                 sendCommand('get_dungeons');
                 sendCommand('get_encounter_history');  // Populate Encounters tab
+                sendCommand('get_suggested_names');     // B1: default the party display-name box
             };
             ws.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
@@ -22373,6 +22379,9 @@ ${attemptLine}
                 else if (msg.type === 'party_encounter_ended') {
                     if (msg.status) updatePartyStatus(msg.status);
                     refreshPartyResults();
+                }
+                else if (msg.type === 'suggested_names') {
+                    renderNameSuggestions(msg.names || []);
                 }
                 else if (msg.type === 'config') {
                     document.getElementById('logPath').value = msg.data.log_path || '';
@@ -23196,10 +23205,38 @@ ${attemptLine}
         }
         
         // Set username
+        // B1: candidate display names from the combat log (F4 get_suggested_names).
+        let partySuggestedNames = [];
+        function renderNameSuggestions(names) {
+            partySuggestedNames = Array.isArray(names) ? names.filter(Boolean) : [];
+            const wrap = document.getElementById('partyNameSuggestions');
+            const chips = document.getElementById('partyNameChips');
+            if (!wrap || !chips) return;
+            // Only surface chips while the name FORM is visible (i.e. no name chosen yet).
+            const area = document.getElementById('partyNameArea');
+            const formVisible = area && area.style.display !== 'none';
+            if (!partySuggestedNames.length || !formVisible) { wrap.style.display = 'none'; return; }
+            chips.innerHTML = partySuggestedNames.map((n) =>
+                `<button type="button" class="party-name-chip" data-name="${escapeHtml(n)}" onclick="pickPartyName(this.dataset.name)" `
+                + `style="margin:2px 4px 2px 0; padding:3px 9px; font-size:12px; border-radius:11px; `
+                + `border:1px solid rgba(34,211,238,0.4); background:rgba(34,211,238,0.12); color:inherit; cursor:pointer;">`
+                + `${escapeHtml(n)}</button>`
+            ).join('');
+            wrap.style.display = 'flex';
+            // One-tap convenience: prefill the box with the top suggestion if it's still empty.
+            const input = document.getElementById('partyUsernameInput');
+            if (input && !input.value.trim() && !partyState.username) input.value = partySuggestedNames[0];
+        }
+        function pickPartyName(name) {
+            const input = document.getElementById('partyUsernameInput');
+            if (input) input.value = name;
+            setPartyUsername();   // one tap = pick + save
+        }
+
         function setPartyUsername() {
             const input = document.getElementById('partyUsernameInput');
             const username = input.value.trim();
-            
+
             if (!username) {
                 alert('Please enter a username');
                 return;
@@ -23255,11 +23292,14 @@ ${attemptLine}
             document.getElementById('partyNameArea').style.display = 'flex';
             document.getElementById('partyNameTag').style.display = 'none';
             document.getElementById('partyUsernameInput').focus();
+            renderNameSuggestions(partySuggestedNames);  // re-surface chips in form view
         }
-        
+
         function showUsernameTag(username) {
             document.getElementById('partyNameArea').style.display = 'none';
             document.getElementById('partyNameTag').style.display = 'flex';
+            const sug = document.getElementById('partyNameSuggestions');
+            if (sug) sug.style.display = 'none';  // name chosen -> hide chips
             document.getElementById('partyUsernameValue').textContent = username;
             document.getElementById('partyJoinSection').style.display = 'flex';
             document.getElementById('partyPlaceholder').style.display = 'none';
