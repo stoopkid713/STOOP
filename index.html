@@ -10732,6 +10732,9 @@
                                         <button class="party-copy-btn" onclick="copyPartyCode()">
                                             <span id="partyCopyText">📋 Copy Code</span>
                                         </button>
+                                        <button class="party-copy-btn" onclick="copyInviteLink()" style="margin-top: 8px;" title="Share a link that shows the code + how to get the app">
+                                            <span id="partyInviteText">🔗 Copy Invite Link</span>
+                                        </button>
                                         <button class="party-copy-btn" onclick="togglePartyOverlay(partyState.party_code, partyState.username, partyState.is_leader)" style="margin-top: 8px; background: linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(167, 139, 250, 0.2));">
                                             <span>📺 Toggle Overlay</span>
                                         </button>
@@ -23602,8 +23605,19 @@ ${attemptLine}
                 navigator.clipboard.writeText(partyState.party_code);
                 const copyText = document.getElementById('partyCopyText');
                 copyText.textContent = '✓ Copied!';
-                setTimeout(() => copyText.textContent = '📋 Copy', 1500);
+                setTimeout(() => copyText.textContent = '📋 Copy Code', 1500);
             }
+        }
+
+        // B2 Cut A: shareable invite link → the gh-pages join page (shows the code + how to get
+        // the app). Drop it in Discord/DM; even a non-user lands on download + join instructions.
+        const INVITE_BASE = 'https://stoopkid713.github.io/TL-DPS-Meter/join.html';
+        function copyInviteLink() {
+            if (!partyState.party_code) return;
+            const link = `${INVITE_BASE}#${encodeURIComponent(partyState.party_code)}`;
+            navigator.clipboard.writeText(link);
+            const t = document.getElementById('partyInviteText');
+            if (t) { t.textContent = '✓ Link Copied!'; setTimeout(() => t.textContent = '🔗 Copy Invite Link', 1500); }
         }
         
         // The room pushes roster + scoreboard automatically; "refresh" is now just a re-render
