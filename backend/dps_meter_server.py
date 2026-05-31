@@ -186,14 +186,18 @@ class DPSMeterServer:
 
     async def _send(self, ws, payload: dict) -> None:
         try:
-            await ws.send(json.dumps(payload))
+            await ws.send(json.dumps(payload, default=str))
         except websockets.ConnectionClosed:
             self.clients.discard(ws)
 
     async def _broadcast(self, payload: dict) -> None:
         if not self.clients:
             return
-        data = json.dumps(payload)
+        # default=str guards against a stray datetime in any payload (e.g. a debug
+        # trace record carrying stats.first_ts/last_ts) — bare json.dumps would raise
+        # in this fire-and-forget Task and silently drop the broadcast. Mirrors
+        # debug._write, which already serializes trace records with default=str.
+        data = json.dumps(payload, default=str)
         for ws in list(self.clients):
             try:
                 await ws.send(data)
@@ -241,7 +245,7 @@ class DPSMeterServer:
         if added or dropped:
             debug.trace("server.ingest", lines_in=len(lines), added=added, dropped=dropped,
                         buffer_hits=len(self.stats.hits),
-                        first_ts=self.stats.first_ts, last_ts=self.stats.last_ts)
+                        first_ts=str(self.stats.first_ts), last_ts=str(self.stats.last_ts))
 
     def _record_party_hit(self, partial: dict) -> None:
         """Fold one hit into the party accumulator and emit ``party_live_hit``."""
