@@ -82,8 +82,12 @@ class PartyState:
     def get_results(self) -> dict:
         """Final per-target breakdown + totals (the ``results`` payload)."""
         target_damage = self.party_stats["target_damage"]
+        first = self.party_stats["first_hit_time"]
+        # Encounter timestamp (epoch ms of the first hit) so the party relay can key
+        # each member's post_fight to the same fight. None until a hit lands.
+        fight_ts = int(first.timestamp() * 1000) if first else None
         if not target_damage:
-            return {"targets": [], "total_damage": 0, "duration": 0}
+            return {"targets": [], "total_damage": 0, "duration": 0, "fight_ts": fight_ts}
         duration = self.get_duration()
         total_damage = sum(v["damage"] for v in target_damage.values())
         targets = []
@@ -108,6 +112,7 @@ class PartyState:
             "targets": targets,
             "total_damage": total_damage,
             "duration": round(duration, 1),
+            "fight_ts": fight_ts,
         }
 
     def get_status(self) -> dict:

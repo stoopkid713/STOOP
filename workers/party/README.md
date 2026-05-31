@@ -17,17 +17,22 @@ and **server-side updatable** (new T&L bosses → one `wrangler deploy`, no app 
 
 **Connect (WebSocket):**
 ```
-wss://<host>/party/<CODE>?user_id=<id>&username=<name>&leader=<0|1>
+wss://<host>/party/<CODE>?user_id=<id>&username=<name>&leader=<0|1>[&spectator=1]
 ```
 - `<CODE>` — 4–8 char uppercase alphanumeric party code. Cap: **12 distinct members** (reconnects free).
+- `spectator=1` — read-only consumer (e.g. the overlay window): receives `welcome` + all broadcasts (roster/scoreboard) but does **not** count toward the cap, does **not** appear in the roster, and **cannot** post/clear/end. `welcome.you.is_spectator` is `true`.
 
 **Client → room** (JSON text frames):
 | type | payload | meaning |
 |---|---|---|
 | `post_fight` | `{ fight_ts, targets: [...] }` | post the full per-target breakdown for one completed fight |
+| `encounter_start` | — | leader-only: arm the party for a fresh pull (clears the board, broadcasts `encounter_start`) |
+| `encounter_end` | — | leader-only: signal everyone to stop recording + `post_fight` (broadcasts `encounter_end`) |
 | `clear` | — | leader-only: wipe the board for a fresh pull |
 | `leave` | — | leave the party (removes member + their data) |
 | `ping` | — | keepalive → room replies `pong` |
+
+Leader-coordinated encounters: the leader sends `encounter_start`/`encounter_end`; the room relays them so every member arms/stops local recording in sync (and a late-joiner reads `encounter_active` from `welcome`). Each member posts its own `post_fight` on stop — the room merges them into the boss scoreboard.
 
 `post_fight` shape (the client dumps ALL targets it damaged — the room picks the boss):
 ```jsonc
@@ -46,9 +51,10 @@ wss://<host>/party/<CODE>?user_id=<id>&username=<name>&leader=<0|1>
 **Room → client** (JSON text frames):
 | type | payload |
 |---|---|
-| `welcome` | `{ you, roster:[...], scoreboard:{...} }` — sent to the joiner |
+| `welcome` | `{ you, roster:[...], scoreboard:{...}, encounter_active }` — sent to the joiner |
 | `roster` | `{ members:[{user_id, username, is_leader, online}] }` |
 | `scoreboard` | `{ boss, boss_category, total_damage, updated_at, entries:[{rank, user_id, username, total_damage, dps, duration, hits, crit_rate, heavy_rate, contribution}] }` |
+| `encounter_start` / `encounter_end` | `{ by }` — leader-relayed; clients arm/stop local recording |
 | `member_joined` / `member_left` / `member_offline` | `{ user_id, username? }` |
 | `pong` | — |
 

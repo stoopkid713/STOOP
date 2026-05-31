@@ -53,7 +53,7 @@ def test_partystate_lifecycle_numbers():
         "encounter_active": False, "party_code": None,
         "total_damage": 0, "target_count": 0,
     }
-    assert ps.get_results() == {"targets": [], "total_damage": 0, "duration": 0}
+    assert ps.get_results() == {"targets": [], "total_damage": 0, "duration": 0, "fight_ts": None}
 
     # Hits before recording are ignored (record_hit no-ops when inactive).
     from combat_log_parser import parse_line
@@ -82,6 +82,8 @@ def test_partystate_lifecycle_numbers():
     assert ps.encounter_active is False
     assert results["total_damage"] == 2300
     assert results["duration"] == 2.0
+    # fight_ts = epoch ms of the first recorded hit (for the party relay post_fight).
+    assert results["fight_ts"] == int(parts[0]["_timestamp"].timestamp() * 1000)
     by_target = {t["target"]: t for t in results["targets"]}
     assert set(by_target) == {"Goblin", "Orc"}
     g = by_target["Goblin"]

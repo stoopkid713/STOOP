@@ -63,11 +63,14 @@ export class PartyRoom {
     const user_id = url.searchParams.get("user_id") || "";
     const username = (url.searchParams.get("username") || "Anon").slice(0, 32);
     const is_leader = url.searchParams.get("leader") === "1";
+    // Spectators (e.g. the read-only overlay window) get the live board WITHOUT joining as a
+    // member: they don't count toward the cap, don't appear in the roster, and can't post.
+    const is_spectator = url.searchParams.get("spectator") === "1";
 
     if (!user_id) return new Response("missing user_id", { status: 400 });
 
     const members = (await this.ctx.storage.get("members")) || {};
-    if (!members[user_id] && Object.keys(members).length >= MAX_MEMBERS) {
+    if (!is_spectator && !members[user_id] && Object.keys(members).length >= MAX_MEMBERS) {
       return new Response("party full", { status: 403 });
     }
 
@@ -78,18 +81,22 @@ export class PartyRoom {
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server, [user_id]); // tag = user_id (survives hibernation)
-    server.serializeAttachment({ user_id, username, is_leader, code });
+    server.serializeAttachment({ user_id, username, is_leader, code, is_spectator });
 
-    members[user_id] = { username, is_leader, joined_at: Date.now() };
-    await this.ctx.storage.put("members", members);
+    if (!is_spectator) {
+      members[user_id] = { username, is_leader, joined_at: Date.now() };
+      await this.ctx.storage.put("members", members);
+    }
 
     server.send(JSON.stringify({
       type: "welcome",
-      you: { user_id, username, is_leader },
+      you: { user_id, username, is_leader, is_spectator },
       ...(await this.snapshot()),
     }));
-    this.broadcastExcept(user_id, { type: "member_joined", user_id, username });
-    this.broadcast(await this.buildRoster());
+    if (!is_spectator) {
+      this.broadcastExcept(user_id, { type: "member_joined", user_id, username });
+      this.broadcast(await this.buildRoster());
+    }
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -100,6 +107,12 @@ export class PartyRoom {
     let msg;
     try { msg = JSON.parse(typeof message === "string" ? message : "{}"); }
     catch (_) { return; }
+
+    // Spectators (overlay) are read-only: keepalive only, no mutations.
+    if (att.is_spectator) {
+      if (msg.type === "ping") ws.send(JSON.stringify({ type: "pong" }));
+      return;
+    }
 
     switch (msg.type) {
       case "ping":
@@ -120,6 +133,22 @@ export class PartyRoom {
         }
         return;
 
+      case "encounter_start": // leader: arm the whole party for a fresh pull
+        if (att.is_leader) {
+          await this.ctx.storage.put("encounter_active", true);
+          await this.ctx.storage.put("fights", {}); // fresh board for the new pull
+          this.broadcast({ type: "encounter_start", by: att.username });
+          this.broadcast(await this.buildScoreboard());
+        }
+        return;
+
+      case "encounter_end": // leader: everyone stop recording + post their fight
+        if (att.is_leader) {
+          await this.ctx.storage.put("encounter_active", false);
+          this.broadcast({ type: "encounter_end", by: att.username });
+        }
+        return;
+
       case "leave":
         await this.removeMember(att.user_id);
         try { ws.close(1000, "left"); } catch (_) {}
@@ -131,6 +160,7 @@ export class PartyRoom {
 
   async webSocketClose(ws) {
     const att = ws.deserializeAttachment() || {};
+    if (att.is_spectator) return; // not a member — nothing to update
     this.broadcast(await this.buildRoster());
     this.broadcastExcept(att.user_id, { type: "member_offline", user_id: att.user_id });
   }
@@ -250,7 +280,8 @@ export class PartyRoom {
   async snapshot() {
     const roster = await this.buildRoster();
     const scoreboard = await this.buildScoreboard();
-    return { roster: roster.members, scoreboard };
+    const encounter_active = !!(await this.ctx.storage.get("encounter_active"));
+    return { roster: roster.members, scoreboard, encounter_active };
   }
 
   // --- broadcast helpers ---

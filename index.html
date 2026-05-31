@@ -10794,7 +10794,7 @@
                                             </div>
                                             <div class="party-diag-item" id="diagSupabase">
                                                 <span class="party-diag-icon">⬜</span>
-                                                <span class="party-diag-label">Supabase connected</span>
+                                                <span class="party-diag-label">Party room connected</span>
                                             </div>
                                             <div class="party-diag-item" id="diagPresence">
                                                 <span class="party-diag-icon">⬜</span>
@@ -11635,7 +11635,7 @@
                                     <li>Run Builder for tracking dungeon runs</li>
                                     <li>Compare tab for side-by-side build comparison</li>
                                     <li>Class selection, grouping by class in Saved list</li>
-                                    <li>Party DPS (beta) via Supabase Realtime</li>
+                                    <li>Party DPS (beta) — post-combat boss scoreboard on an owned Cloudflare relay</li>
                                     <li>Target assignment system, custom dungeon definitions</li>
                                     <li>Piano roll timeline, gap detection, rotation analysis</li>
                                     <li>Global hotkey support (Ctrl+Tab)</li>
@@ -22260,34 +22260,20 @@ ${attemptLine}
                     // Flush any pending renders
                     flushPartyResults();
                     
-                    // Save final results to database for persistence (live broadcast already happened)
-                    if (msg.results && msg.results.targets && supabaseClient && partyState.party_code) {
-                        for (const target of msg.results.targets) {
-                            const result = {
-                                user_id: partyState.user_id,
-                                username: partyState.username,
-                                target_name: target.target,
-                                total_damage: target.total_damage,
-                                duration: target.duration,
-                                dps: target.dps,
-                                hits: target.hits,
-                                crit_rate: target.crit_rate,
-                                heavy_rate: target.heavy_rate,
-                                party_code: partyState.party_code,
-                                submitted_at: new Date().toISOString()
-                            };
-                            
-                            // Save to database for persistence
-                            supabaseClient
-                                .from('encounter_results')
-                                .insert(result)
-                                .then(({ error }) => {
-                                    if (error) {
-                                        console.log('[Party] DB save note:', error.message);
-                                    } else {
-                                        console.log('[Party] Saved to DB:', target.target);
-                                    }
-                                });
+                    // Post this member's full per-target breakdown to the room. The room
+                    // picks the boss server-side, filters trash, and broadcasts the merged
+                    // ranked scoreboard back to everyone (post-combat model).
+                    if (msg.results && msg.results.targets && msg.results.targets.length &&
+                        partyWS && partyWS.readyState === WebSocket.OPEN && partyState.party_code) {
+                        try {
+                            partyWS.send(JSON.stringify({
+                                type: 'post_fight',
+                                fight_ts: msg.results.fight_ts || Date.now(),
+                                targets: msg.results.targets
+                            }));
+                            console.log('[Party] Posted fight to room:', msg.results.targets.length, 'targets');
+                        } catch (err) {
+                            console.warn('[Party] Error posting fight:', err);
                         }
                     }
                 }
@@ -22297,34 +22283,10 @@ ${attemptLine}
                     if (msg.status) updatePartyStatus(msg.status);
                 }
                 else if (msg.type === 'party_live_hit') {
-                    // Live hit during party encounter - broadcast to all members
-                    if (partyChannel && msg.totals && msg.totals.targets) {
-                        // Broadcast full current totals to all party members
-                        for (const target of msg.totals.targets) {
-                            const result = {
-                                user_id: partyState.user_id,
-                                username: partyState.username,
-                                target_name: target.target,
-                                total_damage: target.total_damage,
-                                duration: target.duration,
-                                dps: target.dps,
-                                hits: target.hits,
-                                crit_rate: target.crit_rate,
-                                heavy_rate: target.heavy_rate,
-                                party_code: partyState.party_code
-                            };
-                            
-                            // Broadcast to other members
-                            partyChannel.send({
-                                type: 'broadcast',
-                                event: 'result_update',
-                                payload: result
-                            });
-                            
-                            // Update local state immediately
-                            addPartyResult(result);
-                        }
-                    }
+                    // Post-combat model (Workstream B): we do NOT stream per-hit totals to the
+                    // party. The local server still emits these while recording; we ignore them
+                    // and post one consolidated result on combat-exit (party_recording_stopped).
+                    if (msg.data && msg.data.hit_count > 0) lastLogActivity = Date.now();
                 }
                 else if (msg.type === 'party_stats_reset') {
                     // Party stats were reset
@@ -22706,11 +22668,13 @@ ${attemptLine}
             playerName: null,
             userId: null,
             encounterActive: false,
+            scoreboard: null,  // latest room scoreboard (boss + ranked entries)
             results: {}
         };
         
-        let overlayChannel = null;
-        let overlaySupabase = null;
+        let overlayWS = null;
+        let overlayWSReconnect = null;
+        let overlayWSWantOpen = false;
         
         // Initialize overlay mode if detected
         if (isOverlayMode) {
@@ -22733,69 +22697,63 @@ ${attemptLine}
             });
         }
         
-        // Initialize overlay Supabase connection
-        async function initOverlayConnection(code) {
-            console.log('[Overlay] Connecting to party:', code);
+        // Connect the overlay to the owned room as a read-only SPECTATOR (doesn't consume a
+        // party slot, never appears in the roster). It just renders the room's scoreboard.
+        const OVERLAY_WS_BASE = 'wss://tldps-party.kyle-526.workers.dev';
+        function initOverlayConnection(code) {
+            console.log('[Overlay] Connecting to party room:', code);
             updateOverlayStatus('connecting');
-            
-            try {
-                // Load Supabase
-                await loadSupabaseJS();
-                
-                const SUPABASE_URL = 'https://qxpvixnardkoyzbgqpre.supabase.co';
-                const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4cHZpeG5hcmRrb3l6YmdxcHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxMzE5NTksImV4cCI6MjA4MjcwNzk1OX0.1G_HOiq_bYzwUFTFaSnd7oReJlPdsW3vJFgd0ZrbH_w';
-                
-                overlaySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                
-                // Subscribe to party broadcast channel
-                overlayChannel = overlaySupabase
-                    .channel(`party-${code}`)
-                    .on('broadcast', { event: 'encounter_start' }, (payload) => {
-                        console.log('[Overlay] Encounter started');
-                        overlayState.encounterActive = true;
-                        overlayState.results = {};
+            overlayWSWantOpen = true;
+            if (overlayWSReconnect) { clearTimeout(overlayWSReconnect); overlayWSReconnect = null; }
+            if (overlayWS) { try { overlayWS.onclose = null; overlayWS.close(); } catch (e) {} overlayWS = null; }
+
+            const qs = new URLSearchParams({
+                user_id: overlayState.userId,
+                username: overlayState.playerName || 'Overlay',
+                leader: '0',
+                spectator: '1',
+            });
+            let ws;
+            try { ws = new WebSocket(`${OVERLAY_WS_BASE}/party/${encodeURIComponent(code)}?${qs.toString()}`); }
+            catch (e) { console.error('[Overlay] WS construct failed:', e); updateOverlayStatus('error'); return; }
+            overlayWS = ws;
+
+            ws.onopen = () => {
+                overlayState.connected = true;
+                updateOverlayStatus(overlayState.encounterActive ? 'recording' : 'connected');
+            };
+            ws.onmessage = (ev) => {
+                let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+                switch (m.type) {
+                    case 'welcome':
+                        overlayState.scoreboard = m.scoreboard || null;
+                        overlayState.encounterActive = !!m.encounter_active;
                         renderOverlayResults();
+                        updateOverlayStatus(overlayState.encounterActive ? 'recording' : 'connected');
+                        break;
+                    case 'scoreboard':
+                        overlayState.scoreboard = m;
+                        renderOverlayResults();
+                        break;
+                    case 'encounter_start':
+                        overlayState.encounterActive = true;
                         updateOverlayStatus('recording');
-                    })
-                    .on('broadcast', { event: 'encounter_end' }, (payload) => {
-                        console.log('[Overlay] Encounter ended');
+                        break;
+                    case 'encounter_end':
                         overlayState.encounterActive = false;
                         updateOverlayStatus('connected');
-                    })
-                    .on('broadcast', { event: 'clear_results' }, (payload) => {
-                        console.log('[Overlay] Results cleared');
-                        overlayState.results = {};
-                        renderOverlayResults();
-                    })
-                    .on('broadcast', { event: 'result_update' }, (payload) => {
-                        const result = payload.payload;
-                        if (result && result.user_id && result.target_name) {
-                            const key = `${result.user_id}-${result.target_name}`;
-                            overlayState.results[key] = result;
-                            renderOverlayResults();
-                        }
-                    })
-                    .on('broadcast', { event: 'party_disbanded' }, (payload) => {
-                        console.log('[Overlay] Party disbanded');
-                        updateOverlayStatus('disconnected');
-                        overlayState.results = {};
-                        renderOverlayResults();
-                    })
-                    .subscribe((status) => {
-                        console.log('[Overlay] Channel status:', status);
-                        if (status === 'SUBSCRIBED') {
-                            overlayState.connected = true;
-                            updateOverlayStatus('connected');
-                        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                            overlayState.connected = false;
-                            updateOverlayStatus('disconnected');
-                        }
-                    });
-                    
-            } catch (err) {
-                console.error('[Overlay] Connection error:', err);
-                updateOverlayStatus('error');
-            }
+                        break;
+                }
+            };
+            ws.onerror = () => { console.warn('[Overlay] Room socket error'); };
+            ws.onclose = () => {
+                overlayState.connected = false;
+                updateOverlayStatus('disconnected');
+                if (!overlayWSWantOpen) return;
+                overlayWSReconnect = setTimeout(() => {
+                    if (overlayWSWantOpen) initOverlayConnection(code);
+                }, 2000);
+            };
         }
         
         // Update overlay connection status
@@ -22826,29 +22784,14 @@ ${attemptLine}
             }
         }
         
-        // Render overlay results
+        // Render overlay results — the room already picked the boss, filtered trash, and
+        // ranked members; we just paint the entries.
         function renderOverlayResults() {
             const container = document.getElementById('overlayResults');
-            const results = Object.values(overlayState.results);
-            
-            // Aggregate by user (sum all targets per user)
-            const userTotals = {};
-            results.forEach(r => {
-                if (!userTotals[r.user_id]) {
-                    userTotals[r.user_id] = {
-                        user_id: r.user_id,
-                        username: r.username,
-                        total_damage: 0,
-                        dps: 0
-                    };
-                }
-                userTotals[r.user_id].total_damage += r.total_damage || 0;
-                userTotals[r.user_id].dps += r.dps || 0;
-            });
-            
-            const users = Object.values(userTotals).sort((a, b) => b.total_damage - a.total_damage);
-            
-            if (users.length === 0) {
+            const sb = overlayState.scoreboard;
+            const entries = (sb && Array.isArray(sb.entries)) ? sb.entries : [];
+
+            if (entries.length === 0) {
                 container.innerHTML = `
                     <div class="overlay-empty">
                         <div class="overlay-empty-icon">⏳</div>
@@ -22858,37 +22801,37 @@ ${attemptLine}
                 document.getElementById('overlayPlayerCount').textContent = '0 players';
                 return;
             }
-            
-            const maxDamage = users[0]?.total_damage || 1;
-            
+
+            const maxDamage = entries[0]?.total_damage || 1;
+
             let html = '';
-            users.forEach((user, index) => {
-                const rank = index + 1;
-                const percent = ((user.total_damage / maxDamage) * 100).toFixed(0);
-                const isSelf = user.username === overlayState.playerName;
-                
+            entries.forEach((e) => {
+                const rank = e.rank || 1;
+                const percent = ((e.total_damage / maxDamage) * 100).toFixed(0);
+                const isSelf = e.username === overlayState.playerName;
+
                 let rankClass = '';
                 if (rank === 1) rankClass = 'gold';
                 else if (rank === 2) rankClass = 'silver';
                 else if (rank === 3) rankClass = 'bronze';
-                
+
                 html += `
                     <div class="overlay-result-row ${isSelf ? 'self' : ''}">
                         <div class="overlay-rank ${rankClass}">${rank}</div>
                         <div class="overlay-player-info">
-                            <div class="overlay-player-name">${escapeHtml(user.username)}</div>
+                            <div class="overlay-player-name">${escapeHtml(e.username)}</div>
                             <div class="overlay-damage-bar">
                                 <div class="overlay-damage-bar-fill" style="width: ${percent}%"></div>
                             </div>
                         </div>
-                        <div class="overlay-dps">${formatNumber(user.dps)}</div>
-                        <div class="overlay-damage">${formatDamage(user.total_damage)}</div>
+                        <div class="overlay-dps">${formatNumber(Math.round(e.dps || 0))}</div>
+                        <div class="overlay-damage">${formatDamage(e.total_damage || 0)}</div>
                     </div>
                 `;
             });
-            
+
             container.innerHTML = html;
-            document.getElementById('overlayPlayerCount').textContent = `${users.length} player${users.length !== 1 ? 's' : ''}`;
+            document.getElementById('overlayPlayerCount').textContent = `${entries.length} player${entries.length !== 1 ? 's' : ''}`;
         }
         
         // Format damage for overlay (compact)
@@ -22920,6 +22863,9 @@ ${attemptLine}
         
         // Close overlay
         function overlayClose() {
+            overlayWSWantOpen = false;
+            if (overlayWSReconnect) { clearTimeout(overlayWSReconnect); overlayWSReconnect = null; }
+            if (overlayWS) { try { overlayWS.onclose = null; overlayWS.close(); } catch (e) {} overlayWS = null; }
             if (window.ckOverlay?.closePartyOverlay) {
                 window.ckOverlay.closePartyOverlay();
             } else {
@@ -22980,7 +22926,10 @@ ${attemptLine}
             }
         }
 
-        // === PARTY DPS (Supabase) ===
+        // === PARTY DPS (owned Cloudflare Durable Object room — Workstream B) ===
+        // Transport = a single WebSocket to wss://tldps-party.kyle-526.workers.dev/party/<CODE>.
+        // The room is the source of truth: it picks the boss server-side, filters trash, and
+        // broadcasts a ranked boss scoreboard + roster. Post-combat model — no live streaming.
         let partyState = {
             connected: false,
             connecting: false,
@@ -22991,47 +22940,141 @@ ${attemptLine}
             user_id: '',
             encounter_active: false,
             created_at: null,  // Party creation time for expiration display
+            roster: [],        // [{user_id, username, is_leader, online}] from the room
+            scoreboard: null,  // latest {boss, boss_category, total_damage, entries:[...]} from the room
+            // legacy fields kept so older render paths don't throw:
             members: [],
-            onlineMembers: {},  // user_id -> presence info (from Supabase Presence)
+            onlineMembers: {},
             results: {}
         };
-        
-        // Supabase client for realtime updates
-        let supabaseClient = null;
-        let partyChannel = null;  // Main broadcast channel for all party events
-        let presenceChannel = null;  // For Supabase Presence (live online status)
-        let memberRefreshInterval = null;
-        let expirationInterval = null;  // Update expiration display
-        let subscriptionVersion = 0;  // Track subscription version to abort stale ones
-        let subscribingToParty = false;  // Prevent double subscription attempts
-        
-        const SUPABASE_URL = 'https://qxpvixnardkoyzbgqpre.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4cHZpeG5hcmRrb3l6YmdxcHJlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxMzE5NTksImV4cCI6MjA4MjcwNzk1OX0.1G_HOiq_bYzwUFTFaSnd7oReJlPdsW3vJFgd0ZrbH_w';
-        
-        // Initialize Supabase client
-        function initSupabase() {
-            if (!supabaseClient && window.supabase) {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log('[Party] Supabase client initialized');
-            }
+
+        // --- WebSocket relay to the owned room ---
+        const PARTY_WS_BASE = 'wss://tldps-party.kyle-526.workers.dev';
+        let partyWS = null;
+        let partyWSConnected = false;
+        let partyWSWantOpen = false;   // we intend to stay connected (drives reconnect)
+        let partyWelcomed = false;     // got a welcome since the last (re)connect
+        let partyWSReconnect = null;   // reconnect timer
+        let partyPingInterval = null;  // keepalive
+        let expirationInterval = null; // expiration display timer
+
+        function startPartyPing() {
+            stopPartyPing();
+            partyPingInterval = setInterval(() => {
+                if (partyWS && partyWS.readyState === WebSocket.OPEN) {
+                    try { partyWS.send(JSON.stringify({ type: 'ping' })); } catch (e) {}
+                }
+            }, 30000);
         }
-        
-        // Load Supabase JS library dynamically
-        function loadSupabaseJS() {
-            return new Promise((resolve, reject) => {
-                if (window.supabase) {
-                    resolve();
+        function stopPartyPing() {
+            if (partyPingInterval) { clearInterval(partyPingInterval); partyPingInterval = null; }
+        }
+
+        // Open (or re-open) the room socket. isLeader is passed to the room as a query param.
+        function connectPartyWS(code, isLeader) {
+            if (!partyState.user_id || !partyState.username) return;
+            if (partyWSReconnect) { clearTimeout(partyWSReconnect); partyWSReconnect = null; }
+            partyWSWantOpen = true;
+            partyWelcomed = false;
+            if (partyWS) { try { partyWS.onclose = null; partyWS.close(); } catch (e) {} partyWS = null; }
+
+            const qs = new URLSearchParams({
+                user_id: partyState.user_id,
+                username: partyState.username,
+                leader: isLeader ? '1' : '0',
+            });
+            const url = `${PARTY_WS_BASE}/party/${encodeURIComponent(code)}?${qs.toString()}`;
+            let ws;
+            try { ws = new WebSocket(url); }
+            catch (e) { console.error('[Party] WS construct failed:', e); return; }
+            partyWS = ws;
+
+            ws.onopen = () => {
+                console.log('[Party] Room connected:', code);
+                partyWSConnected = true;
+                startPartyPing();
+                startExpirationTimer();
+                if (diagnosticsOpen) refreshDiagnostics();
+            };
+            ws.onmessage = (ev) => {
+                let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+                handlePartyRoomMessage(m);
+            };
+            ws.onerror = (e) => { console.warn('[Party] Room socket error'); };
+            ws.onclose = () => {
+                partyWSConnected = false;
+                stopPartyPing();
+                if (diagnosticsOpen) refreshDiagnostics();
+                if (!partyWSWantOpen) return;  // intentional leave
+                if (!partyWelcomed) {
+                    // Closed before any welcome on the initial connect = rejected
+                    // (party full / bad code) or unreachable. Don't spin on it.
+                    console.warn('[Party] Could not join room (full, bad code, or offline)');
+                    partyWSWantOpen = false;
+                    alert('Could not join party. It may be full, the code may be invalid, or the server is unreachable.');
+                    partyState.connected = false; partyState.party_code = null;
+                    partyState.is_leader = false; partyState.encounter_active = false;
+                    updatePartyUI();
                     return;
                 }
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/@supabase/supabase-js@2';
-                script.onload = () => {
-                    console.log('[Party] Supabase JS loaded');
-                    resolve();
-                };
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
+                // Otherwise: transient drop — reconnect and keep our spot.
+                console.log('[Party] Room dropped; reconnecting…');
+                partyWSReconnect = setTimeout(() => {
+                    if (partyWSWantOpen && partyState.party_code) {
+                        connectPartyWS(partyState.party_code, partyState.is_leader);
+                    }
+                }, 2000);
+            };
+        }
+
+        function disconnectPartyWS() {
+            partyWSWantOpen = false;
+            if (partyWSReconnect) { clearTimeout(partyWSReconnect); partyWSReconnect = null; }
+            stopPartyPing();
+            stopExpirationTimer();
+            if (partyWS) { try { partyWS.onclose = null; partyWS.close(); } catch (e) {} partyWS = null; }
+            partyWSConnected = false;
+            partyWelcomed = false;
+        }
+
+        // Dispatch a frame from the room (see workers/party/README.md wire protocol).
+        function handlePartyRoomMessage(m) {
+            switch (m && m.type) {
+                case 'welcome':
+                    partyWelcomed = true;
+                    if (m.you) partyState.is_leader = !!m.you.is_leader;
+                    partyState.roster = m.roster || [];
+                    partyState.scoreboard = m.scoreboard || null;
+                    renderPartyMembers();
+                    renderPartyResults();
+                    // Late join into an in-progress encounter: arm local recording.
+                    if (m.encounter_active && !partyState.encounter_active) {
+                        handleEncounterStart(m);
+                    }
+                    updatePartyUI();
+                    break;
+                case 'roster':
+                    partyState.roster = m.members || [];
+                    renderPartyMembers();
+                    break;
+                case 'scoreboard':
+                    partyState.scoreboard = m;
+                    renderPartyResults();
+                    break;
+                case 'encounter_start':
+                    handleEncounterStart(m);
+                    break;
+                case 'encounter_end':
+                    handleEncounterEnd(m);
+                    break;
+                case 'member_joined':
+                case 'member_left':
+                case 'member_offline':
+                    // Roster is refreshed by the room's separate `roster` broadcast.
+                    break;
+                case 'pong':
+                    break;
+            }
         }
         
         // Set username
@@ -23114,92 +23157,37 @@ ${attemptLine}
             return code;
         }
         
-        // Create party - directly via Supabase
+        // Create party — generate a code and open the room as leader.
         async function createParty() {
-            // Check username is set
             if (!partyState.username || !partyState.user_id) {
                 alert('Please enter your username first');
                 return;
             }
-            
-            console.log('[Party] Creating party for user:', partyState.username);
-            
-            try {
-                await loadSupabaseJS();
-                initSupabase();
-                
-                if (!supabaseClient) {
-                    console.error('[Party] Supabase client not initialized');
-                    alert('Failed to initialize Supabase');
-                    return;
+
+            const code = generatePartyCode();
+            console.log('[Party] Creating party:', code);
+
+            partyState.connected = true;
+            partyState.party_code = code;
+            partyState.is_leader = true;
+            partyState.created_at = new Date().toISOString();
+            partyState.encounter_active = false;
+            partyState.roster = [];
+            partyState.scoreboard = null;
+            partyState.results = {};
+
+            connectPartyWS(code, true);
+
+            handlePartyCreated({
+                code: code,
+                status: {
+                    connected: true,
+                    party_code: code,
+                    is_leader: true,
+                    user_id: partyState.user_id,
+                    username: partyState.username
                 }
-                
-                const code = generatePartyCode();
-                const now = new Date().toISOString();
-                
-                console.log('[Party] Creating party with code:', code);
-                
-                // Create party
-                const { data: partyData, error: partyError } = await supabaseClient
-                    .from('parties')
-                    .insert({
-                        code: code,
-                        leader_id: partyState.user_id,
-                        leader_username: partyState.username,
-                        created_at: now,
-                        encounter_active: false
-                    })
-                    .select()
-                    .single();
-                
-                if (partyError) {
-                    console.error('[Party] Error creating party:', partyError);
-                    alert('Failed to create party: ' + partyError.message);
-                    return;
-                }
-                
-                // Add self as member
-                const { error: memberError } = await supabaseClient
-                    .from('party_members')
-                    .insert({
-                        party_code: code,
-                        user_id: partyState.user_id,
-                        username: partyState.username,
-                        connected_at: now,
-                        last_seen: now
-                    });
-                
-                if (memberError) {
-                    console.error('[Party] Error adding self to party:', memberError);
-                }
-                
-                // Update local state
-                partyState.connected = true;
-                partyState.party_code = code;
-                partyState.is_leader = true;
-                partyState.created_at = now;
-                
-                // Subscribe to realtime
-                await subscribeToParty(code);
-                
-                // Update UI
-                handlePartyCreated({
-                    code: code,
-                    status: {
-                        connected: true,
-                        party_code: code,
-                        is_leader: true,
-                        user_id: partyState.user_id,
-                        username: partyState.username
-                    }
-                });
-                
-                console.log('[Party] Created party:', code);
-                
-            } catch (err) {
-                console.error('[Party] Error creating party:', err);
-                alert('Failed to create party: ' + (err.message || err));
-            }
+            });
         }
         
         // Create party and open overlay
@@ -23226,210 +23214,68 @@ ${attemptLine}
             }
         }
         
-        // Join party - directly via Supabase
+        // Join party — open the room with the entered code as a non-leader.
         async function joinParty() {
-            // Check username is set
             if (!partyState.username || !partyState.user_id) {
                 alert('Please enter your username first');
                 return;
             }
-            
+
             const input = document.getElementById('partyJoinCodeInput');
             const code = input.value.trim().toUpperCase();
-            
-            if (code.length !== 4) {
-                alert('Please enter a 4-letter party code');
+
+            if (!/^[A-Z0-9]{4,8}$/.test(code)) {
+                alert('Please enter a valid party code (4–8 letters/numbers)');
                 return;
             }
-            
-            console.log('[Party] Joining party:', code, 'as user:', partyState.username);
-            
-            await loadSupabaseJS();
-            initSupabase();
-            
-            if (!supabaseClient) {
-                console.error('[Party] Supabase client not initialized');
-                alert('Failed to initialize Supabase');
-                return;
-            }
-            
-            try {
-                // Check if party exists
-                const { data: partyData, error: partyError } = await supabaseClient
-                    .from('parties')
-                    .select('*')
-                    .eq('code', code)
-                    .maybeSingle();
-                
-                if (partyError || !partyData) {
-                    console.error('[Party] Party not found:', code, partyError);
-                    alert('Party not found. Check the code and try again.');
-                    return;
+
+            console.log('[Party] Joining party:', code, 'as', partyState.username);
+
+            partyState.connected = true;
+            partyState.party_code = code;
+            partyState.is_leader = false;  // the room's welcome confirms our role
+            partyState.created_at = new Date().toISOString();
+            partyState.encounter_active = false;
+            partyState.roster = [];
+            partyState.scoreboard = null;
+            partyState.results = {};
+
+            connectPartyWS(code, false);
+
+            handlePartyJoined({
+                code: code,
+                status: {
+                    connected: true,
+                    party_code: code,
+                    is_leader: false,
+                    user_id: partyState.user_id,
+                    username: partyState.username
                 }
-                
-                // Check member count (max 20 per party)
-                const MAX_MEMBERS = 20;
-                const { count: memberCount, error: countError } = await supabaseClient
-                    .from('party_members')
-                    .select('*', { count: 'exact', head: true })
-                    .eq('party_code', code);
-                
-                if (!countError && memberCount >= MAX_MEMBERS) {
-                    alert(`Party is full (max ${MAX_MEMBERS} members)`);
-                    return;
-                }
-                
-                const now = new Date().toISOString();
-                
-                // Add self as member (upsert in case already exists)
-                const { error: memberError } = await supabaseClient
-                    .from('party_members')
-                    .upsert({
-                        party_code: code,
-                        user_id: partyState.user_id,
-                        username: partyState.username,
-                        connected_at: now,
-                        last_seen: now
-                    }, { onConflict: 'party_code,user_id' });
-                
-                if (memberError) {
-                    console.error('[Party] Error joining party:', memberError);
-                    alert('Failed to join party: ' + memberError.message);
-                    return;
-                }
-                
-                // Update local state
-                partyState.connected = true;
-                partyState.party_code = code;
-                partyState.is_leader = (partyData.leader_id === partyState.user_id);
-                partyState.created_at = partyData.created_at;
-                
-                // Subscribe to realtime
-                await subscribeToParty(code);
-                
-                // Broadcast that we joined
-                if (partyChannel) {
-                    await partyChannel.send({
-                        type: 'broadcast',
-                        event: 'member_joined',
-                        payload: {
-                            user_id: partyState.user_id,
-                            username: partyState.username
-                        }
-                    });
-                }
-                
-                // Update UI
-                handlePartyJoined({
-                    code: code,
-                    status: {
-                        connected: true,
-                        party_code: code,
-                        is_leader: partyState.is_leader,
-                        user_id: partyState.user_id,
-                        username: partyState.username
-                    }
-                });
-                
-                console.log('[Party] Joined party:', code);
-                
-            } catch (err) {
-                console.error('[Party] Error joining party:', err);
-                alert('Failed to join party');
-            }
+            });
         }
         
-        // Leave party - directly via Supabase
+        // Leave party — tell the room, close the socket, reset local state.
+        // (Phase 1: leader leaving doesn't kick others — room TTL is an open design point.)
         async function leaveParty() {
-            const isLeader = partyState.is_leader;
-            const confirmMsg = isLeader 
-                ? 'Disband this party? All members will be disconnected.' 
-                : 'Leave this party?';
-            
-            if (!confirm(confirmMsg)) return;
-            
-            const code = partyState.party_code;
-            
-            if (isLeader && partyChannel) {
-                // Leader disbanding - broadcast to all members first
-                try {
-                    await partyChannel.send({
-                        type: 'broadcast',
-                        event: 'party_disbanded',
-                        payload: {
-                            disbanded_by: partyState.username,
-                            reason: 'Leader disbanded the party'
-                        }
-                    });
-                } catch (err) {
-                    console.warn('[Party] Error broadcasting disband:', err);
+            if (!confirm('Leave this party?')) return;
+
+            try {
+                if (partyWS && partyWS.readyState === WebSocket.OPEN) {
+                    partyWS.send(JSON.stringify({ type: 'leave' }));
                 }
-            } else if (partyChannel) {
-                // Regular member leaving
-                try {
-                    await partyChannel.send({
-                        type: 'broadcast',
-                        event: 'member_left',
-                        payload: {
-                            user_id: partyState.user_id,
-                            username: partyState.username
-                        }
-                    });
-                } catch (err) {
-                    console.warn('[Party] Error broadcasting leave:', err);
-                }
-            }
-            
-            unsubscribeFromParty();
-            
-            if (supabaseClient && code) {
-                try {
-                    if (isLeader) {
-                        // Leader disbanding - delete everything for this party
-                        console.log('[Party] Leader disbanding party:', code);
-                        
-                        // Delete results first (foreign key dependency)
-                        await supabaseClient
-                            .from('encounter_results')
-                            .delete()
-                            .eq('party_code', code);
-                        
-                        // Delete all members
-                        await supabaseClient
-                            .from('party_members')
-                            .delete()
-                            .eq('party_code', code);
-                        
-                        // Delete the party itself
-                        await supabaseClient
-                            .from('parties')
-                            .delete()
-                            .eq('code', code);
-                        
-                        console.log('[Party] Party disbanded and deleted:', code);
-                    } else {
-                        // Regular member - just remove self
-                        await supabaseClient
-                            .from('party_members')
-                            .delete()
-                            .eq('party_code', code)
-                            .eq('user_id', partyState.user_id);
-                        
-                        console.log('[Party] Left party:', code);
-                    }
-                } catch (err) {
-                    console.error('[Party] Error leaving/disbanding party:', err);
-                }
-            }
-            
-            // Reset local state
+            } catch (err) { console.warn('[Party] Error sending leave:', err); }
+
+            disconnectPartyWS();
+
             partyState.connected = false;
             partyState.party_code = null;
             partyState.is_leader = false;
             partyState.encounter_active = false;
             partyState.results = {};
+            partyState.scoreboard = null;
+            partyState.roster = [];
             partyState.members = [];
-            
+
             handlePartyLeft({
                 status: {
                     connected: false,
@@ -23444,8 +23290,6 @@ ${attemptLine}
         // === DIAGNOSTICS ===
         let diagnosticsOpen = false;
         let lastLogActivity = null;
-        let supabaseConnected = false;
-        let presenceConnected = false;
         
         function toggleDiagnostics() {
             diagnosticsOpen = !diagnosticsOpen;
@@ -23477,11 +23321,12 @@ ${attemptLine}
             const logActive = lastLogActivity && (Date.now() - lastLogActivity) < 30000;
             updateDiagItem('diagLogActive', logActive ? 'ok' : (lastLogActivity ? 'warn' : 'waiting'), logActiveText);
             
-            // 4. Supabase connected
-            updateDiagItem('diagSupabase', supabaseConnected ? 'ok' : 'error', 'Supabase connected');
-            
-            // 5. Presence tracking
-            updateDiagItem('diagPresence', presenceConnected ? 'ok' : 'waiting', 'Presence tracking');
+            // 4. Party room connected (Cloudflare WebSocket)
+            updateDiagItem('diagSupabase', partyWSConnected ? 'ok' : 'error', 'Party room connected');
+
+            // 5. Presence tracking (room roster)
+            const onlineNow = (partyState.roster || []).filter(m => m.online).length;
+            updateDiagItem('diagPresence', partyWSConnected ? 'ok' : 'waiting', partyWSConnected ? `Presence (${onlineNow} online)` : 'Presence tracking');
             
             // 6. Username set
             const hasUsername = partyState.username && partyState.username.length > 0;
@@ -23526,30 +23371,15 @@ ${attemptLine}
             return `${Math.floor(seconds / 3600)}h ago`;
         }
         
-        // Start encounter (leader only) - broadcast to all members
-        async function startEncounter() {
-            if (!partyChannel || !partyState.is_leader) return;
-            
+        // Start encounter (leader only) — the room relays encounter_start to everyone
+        // (including us), which arms each member's local recording via handleEncounterStart.
+        function startEncounter() {
+            if (!partyState.is_leader || !partyWS || partyWS.readyState !== WebSocket.OPEN) return;
             try {
-                // Broadcast to all members
-                await partyChannel.send({
-                    type: 'broadcast',
-                    event: 'encounter_start',
-                    payload: {
-                        started_by: partyState.username,
-                        started_at: new Date().toISOString()
-                    }
-                });
-                
-                // Leader also starts recording locally
-                partyState.encounter_active = true;
-                partyState.results = {};
-                sendCommand('party_start_recording', { party_code: partyState.party_code });
-                updatePartyUI();
-                
-                console.log('[Party] Encounter started by leader');
+                partyWS.send(JSON.stringify({ type: 'encounter_start' }));
+                console.log('[Party] Encounter start sent to room');
             } catch (err) {
-                console.error('[Party] Error broadcasting encounter start:', err);
+                console.error('[Party] Error sending encounter start:', err);
             }
         }
         
@@ -23557,52 +23387,36 @@ ${attemptLine}
         let countdownTimer = null;
         let countdownValue = 5;
         
-        async function endEncounter() {
-            if (!partyChannel || !partyState.is_leader) return;
-            
+        function endEncounter() {
+            if (!partyState.is_leader || !partyWS || partyWS.readyState !== WebSocket.OPEN) return;
+
             // Show countdown
             const countdownDiv = document.getElementById('partyCountdown');
             const countdownTimerEl = document.getElementById('partyCountdownTimer');
             const endBtn = document.getElementById('partyEndBtn');
-            
+
             countdownDiv.style.display = 'block';
             endBtn.style.display = 'none';
             countdownValue = 5;
             countdownTimerEl.textContent = countdownValue;
-            
-            // Broadcast end signal to all members
+
+            // Tell the room — it relays encounter_end to everyone (incl. us), which stops
+            // each member's local recording and triggers their post_fight.
             try {
-                await partyChannel.send({
-                    type: 'broadcast',
-                    event: 'encounter_end',
-                    payload: {
-                        ended_by: partyState.username,
-                        ended_at: new Date().toISOString()
-                    }
-                });
-                
-                // Leader also stops recording locally
-                partyState.encounter_active = false;
-                sendCommand('party_stop_recording');
-                updatePartyUI();
-                
-                console.log('[Party] Encounter ended by leader');
+                partyWS.send(JSON.stringify({ type: 'encounter_end' }));
+                console.log('[Party] Encounter end sent to room');
             } catch (err) {
-                console.error('[Party] Error broadcasting encounter end:', err);
+                console.error('[Party] Error sending encounter end:', err);
             }
-            
-            // UI countdown just for visual feedback
+
+            // UI countdown just for visual feedback (results stream in as members post).
             countdownTimer = setInterval(() => {
                 countdownValue--;
                 countdownTimerEl.textContent = countdownValue;
-                
                 if (countdownValue <= 0) {
                     clearInterval(countdownTimer);
                     countdownTimer = null;
                     countdownDiv.style.display = 'none';
-                    
-                    // Refresh results after countdown
-                    refreshPartyResults();
                 }
             }, 1000);
         }
@@ -23617,77 +23431,14 @@ ${attemptLine}
             }
         }
         
-        // Refresh members list
-        async function refreshPartyMembers() {
-            if (!supabaseClient || !partyState.party_code) return;
-            
-            try {
-                // Get party info
-                const { data: partyData, error: partyError } = await supabaseClient
-                    .from('parties')
-                    .select('*')
-                    .eq('code', partyState.party_code)
-                    .maybeSingle();
-                
-                // Get members
-                const { data: membersData, error: membersError } = await supabaseClient
-                    .from('party_members')
-                    .select('*')
-                    .eq('party_code', partyState.party_code);
-                
-                if (membersError) {
-                    console.error('[Party] Error fetching members:', membersError);
-                    return;
-                }
-                
-                handlePartyMembers({
-                    members: membersData || [],
-                    party_info: partyData,
-                    status: {
-                        connected: partyState.connected,
-                        party_code: partyState.party_code,
-                        is_leader: partyData?.leader_id === partyState.user_id,
-                        user_id: partyState.user_id,
-                        username: partyState.username
-                    }
-                });
-                
-            } catch (err) {
-                console.error('[Party] Error refreshing members:', err);
-            }
+        // The room pushes roster + scoreboard automatically; "refresh" is now just a re-render
+        // of the latest state the room has already sent us.
+        function refreshPartyMembers() {
+            renderPartyMembers();
         }
-        
-        // Refresh results - from Supabase
-        async function refreshPartyResults() {
-            if (!supabaseClient || !partyState.party_code) return;
-            
-            try {
-                // Note: Results are primarily received via broadcast now
-                // This DB query is for initial state or missed broadcasts
-                const { data: resultsData, error: resultsError } = await supabaseClient
-                    .from('encounter_results')
-                    .select('*')
-                    .eq('party_code', partyState.party_code);
-                
-                if (resultsError) {
-                    console.error('[Party] Error fetching results:', resultsError);
-                    return;
-                }
-                
-                handlePartyResults({
-                    results: resultsData || [],
-                    status: {
-                        connected: partyState.connected,
-                        party_code: partyState.party_code,
-                        is_leader: partyState.is_leader,
-                        user_id: partyState.user_id,
-                        username: partyState.username
-                    }
-                });
-                
-            } catch (err) {
-                console.error('[Party] Error refreshing results:', err);
-            }
+
+        function refreshPartyResults() {
+            renderPartyResults();
         }
         
         // Cooldown tracking for leader buttons
@@ -23721,21 +23472,9 @@ ${attemptLine}
             }
         }
         
-        // Broadcast a leader action to all party members
-        async function broadcastLeaderAction(action) {
-            if (!partyChannel || !partyState.is_leader) return;
-            
-            try {
-                await partyChannel.send({
-                    type: 'broadcast',
-                    event: 'leader_action',
-                    payload: { action, from: partyState.user_id }
-                });
-                console.log('[Party] Broadcasted:', action);
-            } catch (err) {
-                console.error('[Party] Broadcast error:', err);
-            }
-        }
+        // Legacy no-op: leader actions (clear/sync) now go through the room directly
+        // (see clearPartyResults → 'clear', syncPartyAll → local re-render).
+        function broadcastLeaderAction(action) { /* room is source of truth; nothing to relay */ }
         
         // Sync all party members (leader only)
         function syncPartyAll() {
@@ -23758,13 +23497,11 @@ ${attemptLine}
                 btn.textContent = '⏳ Sync';
             }
             
-            // Refresh our own data
+            // The room is the source of truth and pushes roster + scoreboard automatically,
+            // so "sync" is just a local re-render of the latest state.
             refreshPartyMembers();
             refreshPartyResults();
-            
-            // Broadcast to all other members
-            broadcastLeaderAction('sync_all');
-            
+
             // Reset cooldown after 3 seconds
             setTimeout(() => {
                 syncPartyCooldown = false;
@@ -23811,19 +23548,15 @@ ${attemptLine}
             
             // Reset local server party stats
             sendCommand('party_reset_stats');
-            
-            // Broadcast to all members to clear their results
-            if (partyChannel) {
-                partyChannel.send({
-                    type: 'broadcast',
-                    event: 'clear_results',
-                    payload: {
-                        cleared_by: partyState.username,
-                        cleared_at: new Date().toISOString()
-                    }
-                });
-            }
-            
+
+            // Tell the room to wipe the shared board (it rebroadcasts an empty scoreboard).
+            partyState.scoreboard = null;
+            try {
+                if (partyWS && partyWS.readyState === WebSocket.OPEN) {
+                    partyWS.send(JSON.stringify({ type: 'clear' }));
+                }
+            } catch (err) { console.warn('[Party] Error sending clear:', err); }
+
             // Re-render empty state
             renderPartyResults();
             
@@ -23837,229 +23570,15 @@ ${attemptLine}
             }, 3000);
         }
         
-        // Subscribe to Supabase realtime updates
-        async function subscribeToParty(code) {
-            // Prevent concurrent subscriptions
-            if (subscribingToParty) {
-                console.log('[Party] Already subscribing, skipping duplicate request');
-                return;
-            }
-            subscribingToParty = true;
-            
-            if (!supabaseClient) {
-                await loadSupabaseJS();
-                initSupabase();
-            }
-            
-            if (!supabaseClient) {
-                console.error('[Party] Supabase not initialized');
-                subscribingToParty = false;
-                return;
-            }
-            
-            // Unsubscribe from previous channels (does NOT increment version here)
-            if (partyChannel) {
-                supabaseClient.removeChannel(partyChannel);
-                partyChannel = null;
-            }
-            if (presenceChannel) {
-                presenceChannel.untrack();
-                supabaseClient.removeChannel(presenceChannel);
-                presenceChannel = null;
-            }
-            if (memberRefreshInterval) {
-                clearInterval(memberRefreshInterval);
-                memberRefreshInterval = null;
-            }
-            
-            // Now increment version and capture it
-            const myVersion = ++subscriptionVersion;
-            
-            console.log('[Party] Subscribing to party:', code);
-            
-            // Main party channel - ALL events via broadcast (no postgres_changes = no WAL polling)
-            partyChannel = supabaseClient
-                .channel(`party-${code}`)
-                .on('broadcast', { event: 'encounter_start' }, (payload) => {
-                    console.log('[Party] Encounter started:', payload);
-                    handleEncounterStart(payload.payload);
-                })
-                .on('broadcast', { event: 'encounter_end' }, (payload) => {
-                    console.log('[Party] Encounter ended:', payload);
-                    handleEncounterEnd(payload.payload);
-                })
-                .on('broadcast', { event: 'clear_results' }, (payload) => {
-                    console.log('[Party] Clear results:', payload);
-                    handleClearResults(payload.payload);
-                })
-                .on('broadcast', { event: 'result_update' }, (payload) => {
-                    console.log('[Party] Result update:', payload.payload?.username, payload.payload?.total_damage);
-                    addPartyResult(payload.payload);
-                })
-                .on('broadcast', { event: 'member_joined' }, (payload) => {
-                    console.log('[Party] Member joined:', payload.payload?.username);
-                    refreshPartyMembers();
-                })
-                .on('broadcast', { event: 'member_left' }, (payload) => {
-                    console.log('[Party] Member left:', payload.payload?.username);
-                    refreshPartyMembers();
-                })
-                .on('broadcast', { event: 'party_disbanded' }, (payload) => {
-                    console.log('[Party] Party disbanded by leader:', payload.payload?.disbanded_by);
-                    alert('Party has been disbanded by the leader.');
-                    
-                    // Clean up local state
-                    unsubscribeFromParty();
-                    partyState.connected = false;
-                    partyState.party_code = null;
-                    partyState.is_leader = false;
-                    partyState.encounter_active = false;
-                    partyState.results = {};
-                    partyState.members = [];
-                    
-                    updatePartyUI();
-                })
-                .on('broadcast', { event: 'leader_action' }, (payload) => {
-                    console.log('[Party] Leader action:', payload);
-                    handleLeaderBroadcast(payload.payload);
-                })
-                .subscribe((status) => {
-                    supabaseConnected = (status === 'SUBSCRIBED');
-                    console.log('[Party] Party channel:', status);
-                    if (diagnosticsOpen) refreshDiagnostics();
-                });
-            
-            // Subscribe to Presence for live online/offline status
-            presenceChannel = supabaseClient.channel(`presence-${code}`, {
-                config: { presence: { key: partyState.user_id } }
-            });
-            
-            presenceChannel
-                .on('presence', { event: 'sync' }, () => {
-                    const state = presenceChannel.presenceState();
-                    partyState.onlineMembers = {};
-                    
-                    // Convert presence state to our format
-                    Object.keys(state).forEach(key => {
-                        const presences = state[key];
-                        if (presences && presences.length > 0) {
-                            const p = presences[0];
-                            partyState.onlineMembers[p.user_id] = {
-                                username: p.username,
-                                online_at: p.online_at
-                            };
-                        }
-                    });
-                    
-                    console.log('[Party] Presence sync:', Object.keys(partyState.onlineMembers).length, 'online');
-                    renderPartyMembers();
-                })
-                .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-                    console.log('[Party] Member came online:', newPresences[0]?.username);
-                })
-                .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-                    console.log('[Party] Member went offline:', leftPresences[0]?.username);
-                })
-                .subscribe(async (status) => {
-                    presenceConnected = (status === 'SUBSCRIBED');
-                    console.log('[Party] Presence channel:', status);
-                    if (status === 'SUBSCRIBED') {
-                        // Track our own presence
-                        await presenceChannel.track({
-                            user_id: partyState.user_id,
-                            username: partyState.username,
-                            online_at: new Date().toISOString()
-                        });
-                        console.log('[Party] Presence tracked for:', partyState.username);
-                    }
-                    if (diagnosticsOpen) refreshDiagnostics();
-                });
-            
-            // Refresh member list from DB once on connect (for initial state)
-            memberRefreshInterval = setInterval(() => {
-                if (partyState.connected) {
-                    refreshPartyMembers();
-                }
-            }, 30000);
-            
-            // Check current party state (in case encounter already started before we subscribed)
-            // Guard against race condition where user leaves party before this runs
-            if (myVersion !== subscriptionVersion || partyState.party_code !== code) {
-                console.log('[Party] Subscription invalidated, aborting state check');
-                return;
-            }
-            
-            try {
-                const { data: partyData, error } = await supabaseClient
-                    .from('parties')
-                    .select('encounter_active, encounter_id, created_at')
-                    .eq('code', code)
-                    .maybeSingle();  // Use maybeSingle to avoid error when no rows
-                
-                // Check again after await in case user left during query
-                if (myVersion !== subscriptionVersion || partyState.party_code !== code) {
-                    console.log('[Party] Subscription invalidated during state query, ignoring result');
-                    return;
-                }
-                
-                if (error) {
-                    console.warn('[Party] Error checking party state:', error.message);
-                    return;
-                }
-                
-                if (partyData) {
-                    // Store created_at and start expiration timer
-                    partyState.created_at = partyData.created_at;
-                    startExpirationTimer();
-                    
-                    if (partyData.encounter_active && !partyState.encounter_active) {
-                        console.log('[Party] Encounter already active - starting recording');
-                        partyState.encounter_active = true;
-                        partyState.results = {};
-                        
-                        // Start recording (late join - encounter in progress)
-                        sendCommand('party_start_recording', { party_code: code });
-                        updatePartyUI();
-                    }
-                }
-            } catch (err) {
-                // Only log if this subscription is still valid
-                if (myVersion === subscriptionVersion && partyState.party_code === code) {
-                    console.error('[Party] Error checking party state:', err);
-                }
-            }
-            
-            // Clear subscribing flag
-            subscribingToParty = false;
+        // Connect to the owned room (thin wrapper kept for callers that say "subscribe").
+        function subscribeToParty(code) {
+            connectPartyWS(code, partyState.is_leader);
         }
-        
-        // Unsubscribe from party channels
+
+        // Disconnect from the room.
         function unsubscribeFromParty() {
-            // Increment version to invalidate any pending subscriptions
-            subscriptionVersion++;
-            subscribingToParty = false;  // Reset flag in case subscription was in progress
-            
-            // Stop expiration timer
-            stopExpirationTimer();
-            
-            if (supabaseClient) {
-                if (partyChannel) {
-                    supabaseClient.removeChannel(partyChannel);
-                    partyChannel = null;
-                }
-                if (presenceChannel) {
-                    presenceChannel.untrack();  // Remove our presence before leaving
-                    supabaseClient.removeChannel(presenceChannel);
-                    presenceChannel = null;
-                }
-            }
-            supabaseConnected = false;
-            presenceConnected = false;
+            disconnectPartyWS();
             partyState.onlineMembers = {};
-            if (memberRefreshInterval) {
-                clearInterval(memberRefreshInterval);
-                memberRefreshInterval = null;
-            }
         }
         
         // Handle encounter start broadcast
@@ -24150,9 +23669,9 @@ ${attemptLine}
             // Track previous code to detect actual party change
             const prevCode = partyState.party_code;
             
-            // Preserve local state when server status doesn't have these values
-            // Server only knows about recording state, not party membership (that's Supabase)
-            // Don't let server's null values overwrite our valid party state
+            // Preserve local state when server status doesn't have these values.
+            // The local Python server only knows recording state, not party membership
+            // (that lives in the Cloudflare room). Don't let null values clobber valid state.
             partyState = {
                 ...partyState,
                 // Only update encounter-related fields from server
@@ -24162,7 +23681,7 @@ ${attemptLine}
             };
             
             // Only update party membership fields if explicitly provided with real values
-            // (these come from frontend Supabase operations, not server)
+            // (these come from the room / local party ops, not the Python server)
             if (status.connected !== undefined && status.connected !== null) {
                 partyState.connected = status.connected;
             }
@@ -24192,11 +23711,11 @@ ${attemptLine}
                 }
             }
             
-            // Subscribe to realtime if we just joined a new party
-            // But don't subscribe if already subscribing or already have a channel
-            if (status.connected && status.party_code && !partyChannel && !subscribingToParty &&
+            // Open the room socket if we just joined a new party and aren't connected yet.
+            // (createParty/joinParty already call connectPartyWS; this is a safety net.)
+            if (status.connected && status.party_code && !partyWS &&
                 (!prevCode || prevCode !== status.party_code)) {
-                subscribeToParty(status.party_code);
+                connectPartyWS(status.party_code, partyState.is_leader);
             }
             
             updatePartyUI();
@@ -24349,12 +23868,10 @@ ${attemptLine}
                 // Show recording indicator during encounter
                 encounterLive.style.display = partyState.encounter_active ? 'flex' : 'none';
                 
-                // Update leave/disband button text based on leader status
+                // Leave button (Phase 1: leader leaving doesn't disband the room for others).
                 const leaveBtn = document.getElementById('partyLeaveBtn');
                 if (leaveBtn) {
-                    leaveBtn.innerHTML = partyState.is_leader 
-                        ? '🗑️ Disband Party' 
-                        : '🚪 Leave Party';
+                    leaveBtn.innerHTML = '🚪 Leave Party';
                 }
                 
             } else {
@@ -24371,27 +23888,27 @@ ${attemptLine}
         function renderPartyMembers() {
             const container = document.getElementById('partyMembersList');
             const countEl = document.getElementById('partyMemberCount');
-            
-            // Count online members from presence
-            const onlineCount = Object.keys(partyState.onlineMembers).length;
-            const totalCount = partyState.members.length;
-            countEl.textContent = `${onlineCount}/${totalCount}`;
-            
-            if (partyState.members.length === 0) {
+
+            // Roster comes straight from the room: [{user_id, username, is_leader, online}].
+            const roster = partyState.roster || [];
+            const onlineCount = roster.filter(m => m.online).length;
+            countEl.textContent = `${onlineCount}/${roster.length}`;
+
+            if (roster.length === 0) {
                 container.innerHTML = '<div class="party-member-item loading">Waiting for members...</div>';
                 return;
             }
-            
-            container.innerHTML = partyState.members.map(m => {
-                const isLeader = m.user_id === partyState.leader_id;
+
+            container.innerHTML = roster.map(m => {
+                const isLeader = !!m.is_leader;
                 const isSelf = m.user_id === partyState.user_id;
-                const isOnline = !!partyState.onlineMembers[m.user_id];
+                const isOnline = !!m.online;
                 const safeName = escapeHtml(m.username);
-                
+
                 let badges = '';
                 if (isLeader) badges += '<span class="party-member-badge leader">👑</span>';
                 if (isSelf) badges += '<span class="party-member-badge you">YOU</span>';
-                
+
                 return `
                     <div class="party-member-item ${isLeader ? 'leader' : ''} ${isSelf ? 'self' : ''} ${!isOnline ? 'offline' : ''}">
                         <span class="party-member-status ${isOnline ? 'online' : 'offline'}"></span>
@@ -24431,105 +23948,86 @@ ${attemptLine}
             renderPartyResults();
         }
         
+        // Pretty labels for the room's boss_category.
+        const PARTY_BOSS_CATEGORY_LABELS = {
+            archboss: '👑 Archboss',
+            field_boss: '🌍 Field Boss',
+            world_boss: '🌍 World Boss',
+            raid_boss: '⚔️ Raid Boss',
+            dungeon_boss: '🏰 Dungeon Boss',
+            boss: '💀 Boss',
+            mini_boss: '☠️ Mini Boss',
+            unknown: '🎯 Boss'
+        };
+
         function renderPartyResults() {
             const container = document.getElementById('partyResultsContainer');
-            const filterSelect = document.getElementById('partyTargetFilter');
-            const selectedTarget = filterSelect ? filterSelect.value : '';
-            
-            const results = Object.values(partyState.results);
-            
-            if (results.length === 0) {
+            const sb = partyState.scoreboard;
+            const entries = (sb && Array.isArray(sb.entries)) ? sb.entries : [];
+
+            if (entries.length === 0) {
                 container.innerHTML = `
                     <div class="party-empty-state">
                         <div class="party-empty-icon">📊</div>
                         <div class="party-empty-title">${partyState.encounter_active ? 'Recording...' : 'No Results Yet'}</div>
-                        <div class="party-empty-text">${partyState.encounter_active ? 'Damage will appear as combat logs sync' : 'Start an encounter to see damage rankings'}</div>
+                        <div class="party-empty-text">${partyState.encounter_active ? 'Boss damage appears when members exit combat' : 'Start an encounter to see the boss scoreboard'}</div>
                     </div>
                 `;
                 return;
             }
-            
-            // Group by target
-            const byTarget = {};
-            results.forEach(r => {
-                if (!byTarget[r.target_name]) byTarget[r.target_name] = [];
-                byTarget[r.target_name].push(r);
-            });
-            
-            // Update target filter dropdown
-            const currentOptions = new Set(Array.from(filterSelect.options).map(o => o.value));
-            const targetNames = Object.keys(byTarget);
-            
-            // Add new targets to dropdown
-            targetNames.forEach(target => {
-                if (!currentOptions.has(target)) {
-                    const option = document.createElement('option');
-                    option.value = target;
-                    option.textContent = target;
-                    filterSelect.appendChild(option);
-                }
-            });
-            
-            // Filter targets if one is selected
-            const targetsToShow = selectedTarget ? { [selectedTarget]: byTarget[selectedTarget] } : byTarget;
-            
-            let html = '';
-            
-            for (const [target, entries] of Object.entries(targetsToShow)) {
-                if (!entries) continue;
-                
-                // Sort by total_damage descending (highest damage at top)
-                entries.sort((a, b) => b.total_damage - a.total_damage);
-                
-                // Calculate total damage for percentage bars
-                const totalDamage = entries.reduce((sum, e) => sum + e.total_damage, 0);
-                const safeTarget = escapeHtml(target);
-                
-                html += `
-                    <div class="party-target-section" data-target="${safeTarget}">
-                        <div class="party-target-header">
-                            <span>🎯</span>
-                            <span class="party-target-name">${safeTarget}</span>
-                            <span class="party-target-total">${formatNumber(totalDamage)} total</span>
-                        </div>
-                        <div class="party-results-bars">
-                            ${entries.map((e, i) => {
-                                const damagePercent = totalDamage > 0 ? (e.total_damage / totalDamage * 100) : 0;
-                                const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
-                                const isYou = e.user_id === partyState.user_id;
-                                const color = getPlayerColor(e.user_id);
-                                const safeName = escapeHtml(e.username);
-                                
-                                return `
-                                    <div class="party-result-row ${rankClass}">
-                                        <div class="party-result-rank ${rankClass}">${i + 1}</div>
-                                        <div class="party-result-bar-container">
-                                            <div class="party-result-bar" style="width: ${damagePercent.toFixed(1)}%; background: ${color.bg}; border-left: 3px solid ${color.text};"></div>
-                                            <div class="party-result-info">
-                                                <span class="party-result-name">
-                                                    <span style="color: ${color.text};">${safeName}</span>
-                                                    ${isYou ? '<span class="party-result-you">YOU</span>' : ''}
-                                                </span>
-                                                <span class="party-result-stats">
-                                                    <span class="party-result-percent">${damagePercent.toFixed(1)}%</span>
-                                                    <span class="party-result-rates">
-                                                        <span class="party-result-crit">${(e.crit_rate || 0).toFixed(0)}% C</span>
-                                                        <span class="party-result-heavy">${(e.heavy_rate || 0).toFixed(0)}% H</span>
-                                                    </span>
-                                                    <span class="party-result-dps">${formatNumber(Math.round(e.dps))} DPS</span>
-                                                    <span class="party-result-damage">${formatNumber(e.total_damage)}</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
+
+            // The room already chose THE BOSS, filtered trash, ranked members, and computed
+            // each member's contribution %. We just render the one boss section.
+            const bossName = escapeHtml(sb.boss || 'Boss');
+            const catLabel = PARTY_BOSS_CATEGORY_LABELS[sb.boss_category] || PARTY_BOSS_CATEGORY_LABELS.unknown;
+            const totalDamage = sb.total_damage || 0;
+
+            const rowsHtml = entries.map((e) => {
+                const pct = (typeof e.contribution === 'number') ? e.contribution
+                    : (totalDamage > 0 ? (e.total_damage / totalDamage * 100) : 0);
+                const rank = e.rank || 1;
+                const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+                const isYou = e.user_id === partyState.user_id;
+                const color = getPlayerColor(e.user_id);
+                const safeName = escapeHtml(e.username);
+
+                return `
+                    <div class="party-result-row ${rankClass}">
+                        <div class="party-result-rank ${rankClass}">${rank}</div>
+                        <div class="party-result-bar-container">
+                            <div class="party-result-bar" style="width: ${pct.toFixed(1)}%; background: ${color.bg}; border-left: 3px solid ${color.text};"></div>
+                            <div class="party-result-info">
+                                <span class="party-result-name">
+                                    <span style="color: ${color.text};">${safeName}</span>
+                                    ${isYou ? '<span class="party-result-you">YOU</span>' : ''}
+                                </span>
+                                <span class="party-result-stats">
+                                    <span class="party-result-percent">${pct.toFixed(1)}%</span>
+                                    <span class="party-result-rates">
+                                        <span class="party-result-crit">${(e.crit_rate || 0).toFixed(0)}% C</span>
+                                        <span class="party-result-heavy">${(e.heavy_rate || 0).toFixed(0)}% H</span>
+                                    </span>
+                                    <span class="party-result-dps">${formatNumber(Math.round(e.dps || 0))} DPS</span>
+                                    <span class="party-result-damage">${formatNumber(e.total_damage || 0)}</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 `;
-            }
-            
-            container.innerHTML = html;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="party-target-section" data-target="${bossName}">
+                    <div class="party-target-header">
+                        <span>${catLabel}</span>
+                        <span class="party-target-name">${bossName}</span>
+                        <span class="party-target-total">${formatNumber(totalDamage)} total</span>
+                    </div>
+                    <div class="party-results-bars">
+                        ${rowsHtml}
+                    </div>
+                </div>
+            `;
         }
         
         function partyLogout() {
