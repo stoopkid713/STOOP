@@ -55,6 +55,12 @@ INJECT_TARGETS = [HERE.parent / "index.html", HERE.parent / "overlay" / "src" / 
 INJECT_START = "@inject:party_render"
 INJECT_END = "@end:party_render"
 
+# The 14k-line app script was carved into source modules under src/js/ (see tools/split_index.py).
+# index.html stays the single file the app loads; each module is inlined into its @inject:<name>
+# region at build time. Edit the modules, not the inlined copy in index.html.
+JS_MODULE_DIR = HERE.parent / "src" / "js"
+JS_MODULE_TARGET = HERE.parent / "index.html"
+
 
 def _party_render_block() -> str:
     """The injectable body of party_render.js: from the first `const PartyRender` line to EOF
@@ -94,6 +100,47 @@ def inline_party_render() -> int:
             print(f"inlined party_render.js -> {target.name}")
         else:
             print(f"party_render.js already current in {target.name}")
+    return 0
+
+
+def _replace_region(raw: str, nl: str, start_token: str, end_token: str, block: str) -> Optional[str]:
+    """Replace the text BETWEEN the @inject marker line and the @end marker line with `block`
+    (inserted verbatim). Returns the new text, or None if the markers are missing/malformed."""
+    s = raw.find(start_token)
+    e = raw.find(end_token)
+    if s == -1 or e == -1 or e < s:
+        return None
+    s_line_end = raw.index(nl, s) + len(nl)        # just after the @inject marker line
+    e_line_start = raw.rfind(nl, 0, e) + len(nl)   # start of the @end marker line
+    return raw[:s_line_end] + block + raw[e_line_start:]
+
+
+def inline_js_modules() -> int:
+    """Inline each src/js/<name>.js into its @inject:<name> region of index.html, VERBATIM (the
+    modules are already in the file's newline style, so a clean round-trip is a no-op). This is the
+    generated app bundle; the modules are the source of truth. Non-fatal: warns + continues."""
+    if not JS_MODULE_DIR.is_dir() or not JS_MODULE_TARGET.is_file():
+        print("js module dir or index.html missing — skipping module inline", file=sys.stderr)
+        return 0
+    for src in sorted(JS_MODULE_DIR.glob("*.js")):
+        name = src.stem
+        with open(src, "r", encoding="utf-8", newline="") as fh:
+            block = fh.read()  # verbatim (preserves CRLF)
+        with open(JS_MODULE_TARGET, "r", encoding="utf-8", newline="") as fh:
+            raw = fh.read()
+        nl = "\r\n" if "\r\n" in raw else "\n"
+        # `@inject:<name> —` / `@end:<name> ` are unique per module (the trailing char after the
+        # name keeps e.g. 'party' from matching 'party_render').
+        new = _replace_region(raw, nl, f"@inject:{name} —", f"@end:{name} ", block)
+        if new is None:
+            print(f"inject markers for '{name}' not found in index.html — skipping", file=sys.stderr)
+            continue
+        if new != raw:
+            with open(JS_MODULE_TARGET, "w", encoding="utf-8", newline="") as fh:
+                fh.write(new)
+            print(f"inlined src/js/{name}.js -> index.html")
+        else:
+            print(f"src/js/{name}.js already current in index.html")
     return 0
 
 
@@ -216,6 +263,7 @@ def build_installer() -> int:
 
 def main(argv: list[str]) -> int:
     inline_party_render()  # refresh the shared party_render.js into base + overlay (non-fatal)
+    inline_js_modules()    # refresh src/js/*.js into index.html's @inject regions (non-fatal)
     rc = build_overlay()   # build + bundle the Tauri overlay first (non-fatal)
     if rc != 0:
         return rc

@@ -11824,6 +11824,7 @@
     </div>
 
     <script>
+        /* @inject:core-init — GENERATED from /src/js/core-init.js by build.py; edit the SOURCE, not here */
         const WS_URL = 'ws://localhost:8765';
         let ws = null;
         let reconnectInterval = null;
@@ -12193,6 +12194,8 @@
             updateWeaponsUI();
         }
 
+        /* @end:core-init */
+        /* @inject:encounter-stats — GENERATED from /src/js/encounter-stats.js by build.py; edit the SOURCE, not here */
         function updateFullEncounter(data) {
             // These elements were removed when Full Encounter became Run Builder
             // Add null checks to prevent errors
@@ -13135,6 +13138,8 @@
             });
         }
         
+        /* @end:encounter-stats */
+        /* @inject:log-export — GENERATED from /src/js/log-export.js by build.py; edit the SOURCE, not here */
         function showExportToast() {
             const toast = document.createElement('div');
             toast.className = 'export-toast';
@@ -14240,6 +14245,8 @@
             toggleEl.classList.toggle('collapsed', !isCollapsed);
         }
         
+        /* @end:log-export */
+        /* @inject:targets-assign — GENERATED from /src/js/targets-assign.js by build.py; edit the SOURCE, not here */
         function filterUnassignedTargets() {
             const searchInput = document.getElementById('unassignedSearch');
             const query = searchInput.value.toLowerCase();
@@ -16036,6 +16043,8 @@
         
         // === CUSTOM MODAL FUNCTIONS ===
         
+        /* @end:targets-assign */
+        /* @inject:saved-runs — GENERATED from /src/js/saved-runs.js by build.py; edit the SOURCE, not here */
         function openCustomModal(mode) {
             const modal = document.getElementById('customDungeonModal');
             const addTypePanel = document.getElementById('customAddTypePanel');
@@ -16938,6 +16947,8 @@ ${attemptLine}
 
         // === RUN LAB ===
 
+        /* @end:saved-runs */
+        /* @inject:run-builder — GENERATED from /src/js/run-builder.js by build.py; edit the SOURCE, not here */
         function setRunLabSlot(slot, idx) {
             // Clear any previous assignment for this slot
             sessionQueue.forEach(item => {
@@ -18676,6 +18687,8 @@ ${attemptLine}
             editingRunData = null;
         }
         
+        /* @end:run-builder */
+        /* @inject:run-types-skills — GENERATED from /src/js/run-types-skills.js by build.py; edit the SOURCE, not here */
         function onEditRunTypeChange() {
             const type = document.getElementById('editRunType').value;
             const modeContainer = document.getElementById('editRunModeContainer');
@@ -20359,6 +20372,8 @@ ${attemptLine}
             calc.textContent = `→ Boss HP ≈ ${formatNumber(bossHp)}`;
         }
         
+        /* @end:run-types-skills */
+        /* @inject:class-insights — GENERATED from /src/js/class-insights.js by build.py; edit the SOURCE, not here */
         function updateClassPreview(className) {
             const card = document.getElementById('classPreviewCard');
             if (!className) {
@@ -22019,6 +22034,8 @@ ${attemptLine}
             document.getElementById('editEncounterModal').classList.remove('active');
         }
 
+        /* @end:class-insights */
+        /* @inject:encounter-edit — GENERATED from /src/js/encounter-edit.js by build.py; edit the SOURCE, not here */
         function saveEncounterEdit() {
             const id = document.getElementById('editEncounterId').value;
             const classValue = document.getElementById('editClassSelect').value;
@@ -23221,6 +23238,8 @@ ${attemptLine}
         // ============================================
         
         // Open party overlay (called from main app buttons)
+        /* @end:encounter-edit */
+        /* @inject:party — GENERATED from /src/js/party.js by build.py; edit the SOURCE, not here */
         function openPartyOverlay(code, name, isLeader) {
             if (window.ckOverlay?.openPartyOverlay) {
                 // Running in Electron - use IPC
@@ -24431,6 +24450,7 @@ ${attemptLine}
         // Shared party scoreboard constants + formatters — SINGLE SOURCE is /party_render.js,
         // inlined here (and into the overlay) by build.py. Base uses PartyRender.CATEGORY_LABELS;
         // the base's own app-wide formatNumber/escapeHtml are intentionally left as-is.
+        /* @end:party */
         /* @inject:party_render — GENERATED from /party_render.js by build.py inline_party_render(); edit the SOURCE, not here */
 const PartyRender = {
   // Pretty labels for the room's boss_category (server-side detected).
@@ -24684,6 +24704,7 @@ const PartyRender = {
   },
 };
         /* @end:party_render */
+        /* @inject:member-detail-tabs — GENERATED from /src/js/member-detail-tabs.js by build.py; edit the SOURCE, not here */
 
         // Phase 2 (A5): repurpose the old Targets dropdown into the encounter switcher.
         // Lists every stored encounter (oldest-first), with a category icon, boss, time, and an
@@ -25502,6 +25523,8 @@ const PartyRender = {
             else encRotationHiddenSkills.add(skill);
             if (lastEncRotationCache) renderEncStackedChart(lastEncRotationCache.rotation, lastEncRotationCache.duration);
         }
+        /* @end:member-detail-tabs */
+        /* @inject:rotation-oracle — GENERATED from /src/js/rotation-oracle.js by build.py; edit the SOURCE, not here */
         function encRotationShowAll() {
             encRotationHiddenSkills.clear();
             if (lastEncRotationCache) renderEncStackedChart(lastEncRotationCache.rotation, lastEncRotationCache.duration);
@@ -26160,6 +26183,7 @@ const PartyRender = {
         }, 2000);
 
         connect();
+        /* @end:rotation-oracle */
     </script>
     <!-- Interactive Tour Overlay -->
     <div id="tourOverlay" style="display:none; position:fixed; inset:0; z-index:9000; pointer-events:all;"
