@@ -991,6 +991,50 @@ def _h_purge_log(s: DPSMeterServer, msg: dict) -> dict:
     return {"type": "log_purged"}
 
 
+def _h_get_suggested_names(s: DPSMeterServer, msg: dict) -> dict:
+    """F4 — surface candidate display name(s) so the party UI can DEFAULT the name box instead of
+    demanding free-text. Primary candidate = the configured ``player_name``; then a best-effort
+    dominant caster (by total damage) from the tail of the active combat log — the player's own
+    character is normally the top caster in their own log. Advisory ONLY: log values are spoofable,
+    identity is not secured (blueprint §10). This is the backend substrate; the one-tap name-picker
+    UI lands with the Onboarding push (shares the identity UI)."""
+    names: list[str] = []
+    configured = (s.config or {}).get("player_name") or ""
+    if configured:
+        names.append(configured)
+    try:
+        from collections import Counter
+        from constants import (
+            IDX_CASTER, IDX_DAMAGE, IDX_LOG_TYPE, LOG_TYPE_DAMAGE, MIN_DAMAGE_FIELDS,
+        )
+        log_dir = s._log_dir()
+        if log_dir and Path(log_dir).is_dir():
+            files = sorted(Path(log_dir).glob("*.txt"))
+            if files:
+                with open(files[-1], "r", encoding="utf-8", errors="replace") as fh:
+                    lines = fh.readlines()[-5000:]  # bounded tail — recent activity only
+                dmg: Counter = Counter()
+                for line in lines:
+                    parts = line.rstrip("\n").rstrip("\r").split(",")
+                    if len(parts) < MIN_DAMAGE_FIELDS or parts[IDX_LOG_TYPE] != LOG_TYPE_DAMAGE:
+                        continue
+                    try:
+                        d = int(parts[IDX_DAMAGE])
+                    except (ValueError, IndexError):
+                        continue
+                    caster = parts[IDX_CASTER]
+                    if caster:
+                        dmg[caster] += d
+                for caster, _ in dmg.most_common():
+                    if caster not in names:
+                        names.append(caster)
+                    if len(names) >= 3:
+                        break
+    except Exception:
+        log.debug("get_suggested_names: log scan failed", exc_info=True)
+    return {"type": "suggested_names", "names": names}
+
+
 HANDLERS: dict[str, Callable[[DPSMeterServer, dict], Optional[dict]]] = {
     # init burst (9)
     "get_config": _h_get_config,
@@ -1005,6 +1049,7 @@ HANDLERS: dict[str, Callable[[DPSMeterServer, dict], Optional[dict]]] = {
     # get_session_encounters has no old handler -> alias to get_encounters (the fix)
     "get_session_encounters": _h_get_encounters,
     # other reads
+    "get_suggested_names": _h_get_suggested_names,  # F4: default the party name box
     "get_builds": _h_get_builds,
     "get_stats": _h_get_stats,
     "get_encounter_details": _h_get_encounter_details,

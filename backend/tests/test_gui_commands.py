@@ -169,3 +169,35 @@ def test_distinct_saves_are_not_deduped(tmp_path):
 
     encs = p.load_encounters(str(tmp_path)).get("encounters", [])
     assert len(encs) == 2
+
+
+# --- get_suggested_names (F4) ----------------------------------------------
+class _NameStub:
+    """Stand-in exposing the two attributes _h_get_suggested_names touches."""
+
+    def __init__(self, player_name="", log_dir=None):
+        self.config = {"player_name": player_name}
+        self._dir = Path(log_dir) if log_dir is not None else None
+
+    def _log_dir(self):
+        return self._dir
+
+
+def test_get_suggested_names_registered():
+    assert "get_suggested_names" in srv.HANDLERS
+
+
+def test_get_suggested_names_prefers_configured_name(tmp_path):
+    res = srv._h_get_suggested_names(_NameStub(player_name="Hero", log_dir=tmp_path), {})
+    assert res["type"] == "suggested_names"
+    assert res["names"][0] == "Hero"   # configured name is the primary candidate
+
+
+def test_get_suggested_names_dominant_caster_from_log(tmp_path):
+    fmt = "20260104-01:00:46:100,DamageDone,Void Slash,123,{dmg},0,0,kNormalHit,{caster},Dummy"
+    rows = [fmt.format(dmg=10000, caster="BigDPS") for _ in range(5)]
+    rows.append(fmt.format(dmg=100, caster="Tinydps"))
+    (tmp_path / "CombatLog_2026-01-04.txt").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    res = srv._h_get_suggested_names(_NameStub(player_name="", log_dir=tmp_path), {})
+    assert res["names"], "expected a suggested name from the log"
+    assert res["names"][0] == "BigDPS"  # highest total-damage caster wins
