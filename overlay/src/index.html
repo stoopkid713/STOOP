@@ -111,17 +111,17 @@
         </div>
 
         <!-- The room chooses THE boss server-side; we just label it. -->
-        <div class="boss-bar" id="bossBar" style="display:none;" data-tauri-drag-region>
+        <div class="boss-bar" id="bossBar" style="display:none;">
             <span class="boss-cat" id="bossCat">🎯 Boss</span>
             <span class="boss-name" id="bossName">—</span>
             <span class="boss-total" id="bossTotal"></span>
         </div>
 
         <div class="results" id="results">
-            <div class="empty" data-tauri-drag-region><div class="empty-icon">⏳</div><div>Waiting for data...</div></div>
+            <div class="empty"><div class="empty-icon">⏳</div><div>Waiting for data...</div></div>
         </div>
 
-        <div class="footer" data-tauri-drag-region>
+        <div class="footer">
             <span id="playerCount">0 players</span>
             <span class="lock-hint" id="lockHint">Ctrl+Shift+O to lock</span>
         </div>
@@ -210,7 +210,7 @@
 
         if (entries.length === 0) {
             bossBar.style.display = 'none';
-            container.innerHTML = `<div class="empty" data-tauri-drag-region><div class="empty-icon">${state.encounterActive ? '⚔️' : '⏳'}</div><div>${state.encounterActive ? 'Recording — results post on combat exit' : 'Waiting for data...'}</div></div>`;
+            container.innerHTML = `<div class="empty"><div class="empty-icon">${state.encounterActive ? '⚔️' : '⏳'}</div><div>${state.encounterActive ? 'Recording — results post on combat exit' : 'Waiting for data...'}</div></div>`;
             document.getElementById('playerCount').textContent = '0 players';
             return;
         }
