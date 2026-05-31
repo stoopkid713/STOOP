@@ -10836,12 +10836,9 @@
                                     <div class="party-results-header">
                                         <h2>📊 Damage Results</h2>
                                         <div class="party-results-actions">
-                                            <select id="partyTargetFilter" class="party-target-filter" onchange="filterPartyResults()">
-                                                <option value="">All Targets</option>
+                                            <select id="partyTargetFilter" class="party-target-filter" onchange="onPartyEncounterChange()" title="Switch between boss encounters (live + past attempts)">
+                                                <option value="">No encounters yet</option>
                                             </select>
-                                            <button class="party-refresh-btn-big" onclick="refreshPartyResults()">
-                                                🔄 Refresh
-                                            </button>
                                             <button class="party-clear-btn" onclick="clearPartyResults()">
                                                 🗑️ Clear
                                             </button>
@@ -23004,7 +23001,12 @@ ${attemptLine}
             encounter_active: false,
             created_at: null,  // Party creation time for expiration display
             roster: [],        // [{user_id, username, is_leader, online}] from the room
-            scoreboard: null,  // latest {boss, boss_category, total_damage, entries:[...]} from the room
+            scoreboard: null,  // latest (active) {encounter_id, boss, boss_category, total_damage, entries:[...]} from the room
+            // Phase 2 (A5) — multi-encounter switcher:
+            encounters: [],            // room enumeration: [{encounter_id, boss, boss_category, started_at, ended, entries_n, total_damage}]
+            active_encounter_id: null, // the room's currently-active encounter
+            viewing_encounter_id: null,// which encounter the UI shows (null = follow active)
+            boards: {},                // cache of scoreboards keyed by encounter_id (from `scoreboard` broadcasts)
             // legacy fields kept so older render paths don't throw:
             members: [],
             onlineMembers: {},
@@ -23128,7 +23130,18 @@ ${attemptLine}
                     if (m.you) partyState.is_leader = !!m.you.is_leader;
                     partyState.roster = m.roster || [];
                     partyState.scoreboard = m.scoreboard || null;
+                    partyState.encounters = m.encounters || [];
+                    partyState.active_encounter_id = m.active_encounter_id
+                        || (m.scoreboard && m.scoreboard.encounter_id) || null;
+                    if (m.scoreboard && m.scoreboard.encounter_id) {
+                        partyState.boards[m.scoreboard.encounter_id] = m.scoreboard;
+                    }
+                    // Default to following the active encounter on (re)join.
+                    if (partyState.viewing_encounter_id == null) {
+                        partyState.viewing_encounter_id = partyState.active_encounter_id;
+                    }
                     renderPartyMembers();
+                    renderEncounterSwitcher();
                     renderPartyResults();
                     // Late join into an in-progress encounter: arm local recording.
                     if (m.encounter_active && !partyState.encounter_active) {
@@ -23141,9 +23154,31 @@ ${attemptLine}
                     renderPartyMembers();
                     break;
                 case 'scoreboard':
-                    partyState.scoreboard = m;
+                    // Cache every board by its encounter_id so the switcher can show past ones.
+                    if (m.encounter_id) partyState.boards[m.encounter_id] = m;
+                    partyState.scoreboard = m; // last board (the active one) for legacy paths
+                    // Re-render only if the user is currently viewing THIS encounter (or following
+                    // active). Updates for an encounter they aren't looking at are cached silently.
+                    if (partyState.viewing_encounter_id == null
+                        || partyState.viewing_encounter_id === m.encounter_id) {
+                        renderPartyResults();
+                    }
+                    break;
+                case 'encounters': {
+                    // Enumeration of all stored encounters (A4). Update the switcher; auto-follow
+                    // the new active encounter ONLY if the user was following active / on the
+                    // previous active (don't yank them off a past board they opened).
+                    const prevActive = partyState.active_encounter_id;
+                    partyState.encounters = m.list || [];
+                    partyState.active_encounter_id = m.active_id || null;
+                    if (partyState.viewing_encounter_id == null
+                        || partyState.viewing_encounter_id === prevActive) {
+                        partyState.viewing_encounter_id = partyState.active_encounter_id;
+                    }
+                    renderEncounterSwitcher();
                     renderPartyResults();
                     break;
+                }
                 case 'encounter_start':
                     handleEncounterStart(m);
                     break;
@@ -23258,6 +23293,11 @@ ${attemptLine}
             partyState.roster = [];
             partyState.scoreboard = null;
             partyState.results = {};
+            // Fresh switcher state for the new room (welcome will repopulate).
+            partyState.encounters = [];
+            partyState.active_encounter_id = null;
+            partyState.viewing_encounter_id = null;
+            partyState.boards = {};
 
             connectPartyWS(code, true);
 
@@ -23322,6 +23362,10 @@ ${attemptLine}
             partyState.roster = [];
             partyState.scoreboard = null;
             partyState.results = {};
+            partyState.encounters = [];
+            partyState.active_encounter_id = null;
+            partyState.viewing_encounter_id = null;
+            partyState.boards = {};
 
             connectPartyWS(code, false);
 
@@ -23358,6 +23402,11 @@ ${attemptLine}
             partyState.scoreboard = null;
             partyState.roster = [];
             partyState.members = [];
+            partyState.encounters = [];
+            partyState.active_encounter_id = null;
+            partyState.viewing_encounter_id = null;
+            partyState.boards = {};
+            renderEncounterSwitcher();
 
             handlePartyLeft({
                 status: {
@@ -24072,9 +24121,64 @@ const PartyRender = {
 };
         /* @end:party_render */
 
+        // Phase 2 (A5): repurpose the old Targets dropdown into the encounter switcher.
+        // Lists every stored encounter (oldest-first), with a category icon, boss, time, and an
+        // attempt ordinal (#1/#2) for duplicate bosses; the live/active one is marked ●.
+        function renderEncounterSwitcher() {
+            const sel = document.getElementById('partyTargetFilter');
+            if (!sel) return;
+            const list = partyState.encounters || [];
+            if (!list.length) {
+                sel.innerHTML = '<option value="">No encounters yet</option>';
+                return;
+            }
+            // Count boss occurrences first so duplicates get ordinals.
+            const totalByBoss = {};
+            list.forEach((e) => { const k = (e.boss || '∅').toLowerCase(); totalByBoss[k] = (totalByBoss[k] || 0) + 1; });
+            const seen = {};
+            const activeId = partyState.active_encounter_id;
+            sel.innerHTML = list.map((e) => {
+                const k = (e.boss || '∅').toLowerCase();
+                seen[k] = (seen[k] || 0) + 1;
+                const ord = totalByBoss[k] > 1 ? ` #${seen[k]}` : '';
+                const icon = PartyRender.catLabel(e.boss_category || 'unknown').split(' ')[0];
+                const bossName = e.boss || 'Recording…';
+                const t = e.started_at ? new Date(e.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                const live = (e.encounter_id === activeId && !e.ended) ? ' ●' : '';
+                const text = `${icon} ${bossName}${ord}${t ? ' · ' + t : ''}${live}`;
+                return `<option value="${escapeHtml(e.encounter_id)}">${escapeHtml(text)}</option>`;
+            }).join('');
+            sel.value = partyState.viewing_encounter_id || activeId || '';
+        }
+
+        function onPartyEncounterChange() {
+            const sel = document.getElementById('partyTargetFilter');
+            if (!sel) return;
+            partyState.viewing_encounter_id = sel.value || null;
+            renderPartyResults();
+        }
+
         function renderPartyResults() {
             const container = document.getElementById('partyResultsContainer');
-            const sb = partyState.scoreboard;
+            // Resolve which encounter's board to show: the explicitly-viewed one, else the active.
+            const viewId = partyState.viewing_encounter_id || partyState.active_encounter_id;
+            let sb;
+            if (viewId && partyState.boards[viewId]) {
+                sb = partyState.boards[viewId];
+            } else if (!viewId) {
+                sb = partyState.scoreboard; // following active before any explicit selection
+            } else {
+                // A past encounter we have no cached board for (e.g. joined after it ended).
+                const meta = (partyState.encounters || []).find((e) => e.encounter_id === viewId);
+                container.innerHTML = `
+                    <div class="party-empty-state">
+                        <div class="party-empty-icon">📊</div>
+                        <div class="party-empty-title">${meta && meta.boss ? escapeHtml(meta.boss) : 'Encounter'}</div>
+                        <div class="party-empty-text">Detailed board not available — you weren't connected during this encounter.${meta ? ` (${meta.entries_n || 0} members · ${formatNumber(meta.total_damage || 0)} total)` : ''}</div>
+                    </div>
+                `;
+                return;
+            }
             const entries = (sb && Array.isArray(sb.entries)) ? sb.entries : [];
 
             if (entries.length === 0) {

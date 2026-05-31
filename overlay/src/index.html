@@ -110,11 +110,15 @@
             </div>
         </div>
 
-        <!-- The room chooses THE boss server-side; we just label it. -->
+        <!-- The room chooses THE boss server-side; we just label it. Chevrons step through
+             stored encounters (Phase 2 / A5) — compact equivalent of the base view's switcher. -->
         <div class="boss-bar" id="bossBar" style="display:none;">
+            <span id="encPrev" title="Previous encounter" onclick="ovEncStep(-1)" style="cursor:pointer; padding:0 3px; display:none;">‹</span>
             <span class="boss-cat" id="bossCat">🎯 Boss</span>
             <span class="boss-name" id="bossName">—</span>
             <span class="boss-total" id="bossTotal"></span>
+            <span id="encPos" style="opacity:0.5; font-size:10px; margin-left:auto;"></span>
+            <span id="encNext" title="Next encounter" onclick="ovEncStep(1)" style="cursor:pointer; padding:0 3px; display:none;">›</span>
         </div>
 
         <div class="results" id="results">
@@ -180,7 +184,11 @@ const PartyRender = {
     const formatDamage = PartyRender.fmtDmg;
     const escapeHtml = PartyRender.escapeHtml;
 
-    const state = { connected: false, encounterActive: false, scoreboard: null, isLocked: false };
+    const state = {
+        connected: false, encounterActive: false, scoreboard: null, isLocked: false,
+        // Phase 2 (A5): multi-encounter stepping.
+        encounters: [], activeId: null, viewingId: null, boards: {},
+    };
     let ws = null, wantOpen = false, reconnectTimer = null;
 
     document.getElementById('partyCode').textContent = partyCode || '----';
@@ -213,9 +221,26 @@ const PartyRender = {
                 case 'welcome':
                     state.scoreboard = m.scoreboard || null;
                     state.encounterActive = !!m.encounter_active;
+                    state.encounters = m.encounters || [];
+                    state.activeId = m.active_encounter_id || (m.scoreboard && m.scoreboard.encounter_id) || null;
+                    if (m.scoreboard && m.scoreboard.encounter_id) state.boards[m.scoreboard.encounter_id] = m.scoreboard;
+                    if (state.viewingId == null) state.viewingId = state.activeId;
                     render(); updateStatus(state.encounterActive ? 'recording' : 'connected', state.encounterActive ? '● REC' : 'Connected');
                     break;
-                case 'scoreboard': state.scoreboard = m; render(); break;
+                case 'scoreboard':
+                    if (m.encounter_id) state.boards[m.encounter_id] = m;
+                    state.scoreboard = m;
+                    if (state.viewingId == null || state.viewingId === m.encounter_id) render();
+                    break;
+                case 'encounters': {
+                    const prevActive = state.activeId;
+                    state.encounters = m.list || [];
+                    state.activeId = m.active_id || null;
+                    // Auto-follow the new active only if the user was on the previous active / following.
+                    if (state.viewingId == null || state.viewingId === prevActive) state.viewingId = state.activeId;
+                    render();
+                    break;
+                }
                 case 'encounter_start': state.encounterActive = true; updateStatus('recording', '● REC'); break;
                 case 'encounter_end': state.encounterActive = false; updateStatus('connected', 'Connected'); break;
             }
@@ -236,14 +261,54 @@ const PartyRender = {
         document.getElementById('statusText').textContent = text;
     }
 
+    // Prev/next encounter stepping (A5) — compact analogue of the base switcher.
+    function renderEncNav() {
+        const list = state.encounters || [];
+        const prev = document.getElementById('encPrev');
+        const next = document.getElementById('encNext');
+        const pos = document.getElementById('encPos');
+        if (!prev) return;
+        if (list.length <= 1) { prev.style.display = next.style.display = 'none'; pos.textContent = ''; return; }
+        prev.style.display = next.style.display = '';
+        const curId = state.viewingId || state.activeId;
+        let idx = list.findIndex((e) => e.encounter_id === curId);
+        if (idx < 0) idx = list.length - 1;
+        pos.textContent = `${idx + 1}/${list.length}`;
+        prev.style.opacity = idx > 0 ? '0.85' : '0.25';
+        next.style.opacity = idx < list.length - 1 ? '0.85' : '0.25';
+    }
+    function ovEncStep(delta) {
+        const list = state.encounters || [];
+        if (!list.length) return;
+        const curId = state.viewingId || state.activeId;
+        let idx = list.findIndex((e) => e.encounter_id === curId);
+        if (idx < 0) idx = list.length - 1;
+        state.viewingId = list[Math.max(0, Math.min(list.length - 1, idx + delta))].encounter_id;
+        render();
+    }
+
     function render() {
         const container = document.getElementById('results');
-        const sb = state.scoreboard;
+        // Resolve the viewed encounter's board (explicit selection, else active).
+        const viewId = state.viewingId || state.activeId;
+        const sb = (viewId && state.boards[viewId]) ? state.boards[viewId]
+                 : (!viewId ? state.scoreboard : null);
         const entries = (sb && Array.isArray(sb.entries)) ? sb.entries : [];
         const bossBar = document.getElementById('bossBar');
+        renderEncNav();
 
         if (entries.length === 0) {
-            bossBar.style.display = 'none';
+            // Keep the bar (with nav chevrons) visible when there are multiple encounters, so a
+            // spectator who stepped onto an empty/uncached past board can step back to the live one.
+            if ((state.encounters || []).length > 1) {
+                bossBar.style.display = 'flex';
+                const meta = (state.encounters || []).find((e) => e.encounter_id === viewId);
+                document.getElementById('bossCat').textContent = BOSS_CAT_LABELS[(meta && meta.boss_category) || 'unknown'] || BOSS_CAT_LABELS.unknown;
+                document.getElementById('bossName').textContent = (meta && meta.boss) || '—';
+                document.getElementById('bossTotal').textContent = '';
+            } else {
+                bossBar.style.display = 'none';
+            }
             container.innerHTML = `<div class="empty"><div class="empty-icon">${state.encounterActive ? '⚔️' : '⏳'}</div><div>${state.encounterActive ? 'Recording — results post on combat exit' : 'Waiting for data...'}</div></div>`;
             document.getElementById('playerCount').textContent = '0 players';
             return;
