@@ -1,0 +1,65 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — ツCKヤ DPS Meter</title>
+<style>
+body{font-family:Segoe UI,system-ui,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);color:#e2e8f0;padding:56px 20px;min-height:100vh;margin:0}
+.card{max-width:680px;margin:0 auto;background:rgba(0,0,0,.2);border-radius:14px;padding:36px 32px;text-align:left}
+h1{font-size:2rem;margin-top:0;margin-bottom:4px;text-align:center}
+h2{font-size:1.15rem;color:#22d3ee;margin-top:2em;margin-bottom:.4em;border-bottom:1px solid rgba(34,211,238,.2);padding-bottom:.3em}
+p,li{line-height:1.75;margin:.4em 0}
+ul{padding-left:1.4em}
+a{color:#22d3ee;text-decoration:none}
+a:hover{text-decoration:underline}
+.dim{color:#64748b;font-size:.85rem;margin-top:28px;text-align:center}
+.updated{color:#64748b;font-size:.85rem;text-align:center;margin-bottom:2em}
+code{background:rgba(34,211,238,.1);border-radius:4px;padding:1px 5px;font-family:Consolas,monospace;font-size:.9em}
+</style></head>
+<body>
+<div class="card">
+  <h1>ツCKヤ DPS Meter — Privacy Policy</h1>
+  <p class="updated">Last updated: 2026-05-31</p>
+
+  <p>This app is built on a simple principle: <strong>your data stays on your machine</strong>. There are no user accounts, no ads, and no third-party analytics or tracking of any kind. This page describes the small set of cases where data does leave your device, and how you can opt out.</p>
+
+  <h2>1. Combat Log Files &amp; Character Names</h2>
+  <p>ツCKヤ DPS Meter reads Throne &amp; Liberty combat log files from your local disk to calculate damage per second and build performance. These files contain <strong>in-game character names</strong> (yours and other players' in your party/raid). The app reads these files locally; their contents are never uploaded or transmitted to any server unless you explicitly use the features described in Sections 3 and 4 below.</p>
+
+  <h2>2. Windows Username in File Paths</h2>
+  <p>Because Throne &amp; Liberty stores combat logs under your Windows user profile (for example, <code>C:\Users\YourName\...</code>), the file paths the app works with embed your <strong>Windows username</strong>. This path is used only locally for file I/O. It is not stored, logged, or sent anywhere — except that the sanitized config snapshot in the optional feedback feature (Section 3) strips full paths before sending. See below for details.</p>
+
+  <h2>3. Optional In-App Feedback &amp; Bug Reports</h2>
+  <p>The app includes an optional feedback and bug-report feature. <strong>This feature only activates when you explicitly choose to submit a report.</strong> Nothing is sent silently or automatically.</p>
+  <p>When you submit a report, the following is sent to the app's backend:</p>
+  <ul>
+    <li>An in-memory event buffer — roughly the last 200 app events (UI actions, parse results, errors) recorded in RAM since launch. No file contents are included.</li>
+    <li>App version number.</li>
+    <li>Basic OS information (Windows version, architecture).</li>
+    <li>A sanitized configuration snapshot — settings like parser mode, selected columns, and similar preferences. File paths (including those containing your Windows username) are stripped from this snapshot before it is sent.</li>
+  </ul>
+  <p><strong>To opt out:</strong> Simply don't use the feedback feature. There is no opt-in or account required to use the rest of the app; the feature is only invoked when you press "Send Feedback" or equivalent in the UI.</p>
+
+  <h2>4. Party DPS Scoreboard (Party Feature)</h2>
+  <p>The Party DPS tab lets a group of players share a live scoreboard. When this feature is in use, the app transmits <strong>combat result data</strong> (per-boss DPS scores and character names for the current session) to an owned Cloudflare Worker that powers the shared scoreboard. This data is:</p>
+  <ul>
+    <li>Scoped to the active party session only.</li>
+    <li>Not linked to any real-world identity — only the in-game character name you choose to display.</li>
+    <li>Stored on the worker only as long as needed to serve the scoreboard — capped to the most recent encounters and automatically deleted as new ones arrive. Never sold or shared.</li>
+  </ul>
+  <p><strong>To opt out:</strong> Don't join or create a party. All other app features (local parse, build testing, history) work entirely offline without touching this service.</p>
+
+  <h2>5. What We Don't Collect</h2>
+  <ul>
+    <li>No user accounts or sign-in of any kind.</li>
+    <li>No advertising or third-party analytics (no Google Analytics, Sentry, Mixpanel, etc.).</li>
+    <li>No telemetry collected passively in the background.</li>
+    <li>No payment information — the app is free and open source.</li>
+  </ul>
+
+  <h2>6. Contact &amp; Questions</h2>
+  <p>If you have questions about this policy or want to report a privacy concern, open an issue on the GitHub repository:</p>
+  <p><a href="https://github.com/stoopkid713/TL-DPS-Meter/issues">github.com/stoopkid713/TL-DPS-Meter/issues</a></p>
+  <p>You can also reach the community via the Discord server linked from the GitHub page.</p>
+
+  <p class="dim"><a href="./">Downloads</a> · <a href="https://github.com/stoopkid713/TL-DPS-Meter">Source on GitHub</a> · MIT · Not affiliated with NCSOFT or Amazon Games</p>
+</div>
+</body></html>
