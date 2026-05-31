@@ -16,6 +16,14 @@
 const CODE_RE = /^[A-Z0-9]{4,8}$/;
 const MAX_MEMBERS = 12;
 
+// Structured logging (F6). One JSON line per meaningful event -> `wrangler tail` becomes a
+// real monitor. Mirrors the backend's `debug.trace` philosophy so the whole system traces
+// consistently. Pure observability: no behavior change, no protocol change. [observability]
+// is already enabled in wrangler.toml, so these lines are queryable in the CF dashboard too.
+const logEvent = (t, fields) => {
+  try { console.log(JSON.stringify({ t, ts: Date.now(), ...fields })); } catch (_) {}
+};
+
 // Optional, deployable boss-name -> category map. Detection works WITHOUT this (pure
 // convergence picks the boss); this only adds a category label and disambiguates when a
 // known boss is present. Keyed by normalized (lowercased/trimmed) target name. Extend it
@@ -71,6 +79,7 @@ export class PartyRoom {
 
     const members = (await this.ctx.storage.get("members")) || {};
     if (!is_spectator && !members[user_id] && Object.keys(members).length >= MAX_MEMBERS) {
+      logEvent("party_full", { code, user_id, members: Object.keys(members).length });
       return new Response("party full", { status: 403 });
     }
 
@@ -87,6 +96,11 @@ export class PartyRoom {
       members[user_id] = { username, is_leader, joined_at: Date.now() };
       await this.ctx.storage.put("members", members);
     }
+
+    logEvent("join", {
+      code, user_id, username, is_leader, is_spectator,
+      members: Object.keys(members).length,
+    });
 
     server.send(JSON.stringify({
       type: "welcome",
@@ -128,6 +142,7 @@ export class PartyRoom {
 
       case "clear": // leader starts a fresh board (new pull)
         if (att.is_leader) {
+          logEvent("clear", { by: att.username, user_id: att.user_id });
           await this.ctx.storage.put("fights", {});
           this.broadcast(await this.buildScoreboard());
         }
@@ -135,6 +150,7 @@ export class PartyRoom {
 
       case "encounter_start": // leader: arm the whole party for a fresh pull
         if (att.is_leader) {
+          logEvent("encounter_start", { by: att.username, user_id: att.user_id });
           await this.ctx.storage.put("encounter_active", true);
           await this.ctx.storage.put("fights", {}); // fresh board for the new pull
           this.broadcast({ type: "encounter_start", by: att.username });
@@ -144,12 +160,14 @@ export class PartyRoom {
 
       case "encounter_end": // leader: everyone stop recording + post their fight
         if (att.is_leader) {
+          logEvent("encounter_end", { by: att.username, user_id: att.user_id });
           await this.ctx.storage.put("encounter_active", false);
           this.broadcast({ type: "encounter_end", by: att.username });
         }
         return;
 
       case "leave":
+        logEvent("leave", { user_id: att.user_id, username: att.username });
         await this.removeMember(att.user_id);
         try { ws.close(1000, "left"); } catch (_) {}
         this.broadcast(await this.buildRoster());
@@ -161,6 +179,7 @@ export class PartyRoom {
   async webSocketClose(ws) {
     const att = ws.deserializeAttachment() || {};
     if (att.is_spectator) return; // not a member — nothing to update
+    logEvent("member_offline", { user_id: att.user_id, username: att.username });
     this.broadcast(await this.buildRoster());
     this.broadcastExcept(att.user_id, { type: "member_offline", user_id: att.user_id });
   }
@@ -190,6 +209,11 @@ export class PartyRoom {
       })),
     };
     await this.ctx.storage.put("fights", fights);
+    logEvent("post_fight", {
+      user_id, username,
+      fight_ts: fights[user_id].fight_ts,
+      n_targets: fights[user_id].targets.length,
+    });
   }
 
   async removeMember(user_id) {
@@ -220,7 +244,11 @@ export class PartyRoom {
     const pool = knownKeys.length ? knownKeys : keys;
     pool.sort((a, b) => agg[b].damage - agg[a].damage);
     const bossKey = pool[0];
-    return { name: agg[bossKey].name, category: KNOWN_BOSSES[bossKey] || "unknown" };
+    return {
+      name: agg[bossKey].name,
+      category: KNOWN_BOSSES[bossKey] || "unknown",
+      pool_size: keys.length, // distinct targets seen across all submissions
+    };
   }
 
   // --- views ---
@@ -229,8 +257,13 @@ export class PartyRoom {
     const submissions = Object.values(fights);
     const boss = this.detectBoss(submissions);
     if (!boss) {
+      logEvent("scoreboard_built", { boss: null, entries: 0, total_damage: 0, submissions: submissions.length });
       return { type: "scoreboard", boss: null, boss_category: null, entries: [], total_damage: 0, updated_at: Date.now() };
     }
+    logEvent("boss_detected", {
+      boss: boss.name, category: boss.category,
+      pool_size: boss.pool_size, submissions: submissions.length,
+    });
     const bossKey = norm(boss.name);
     // Each member's damage to THE BOSS (trash filtered by definition).
     const board = [];
@@ -240,6 +273,7 @@ export class PartyRoom {
     }
     const total = board.reduce((s, e) => s + e.total_damage, 0);
     board.sort((a, b) => b.total_damage - a.total_damage);
+    logEvent("scoreboard_built", { boss: boss.name, entries: board.length, total_damage: total });
     return {
       type: "scoreboard",
       boss: boss.name,
