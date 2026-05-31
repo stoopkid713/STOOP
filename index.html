@@ -22043,6 +22043,7 @@ ${attemptLine}
             
             // Update welcome modal status
             const detected = !!(info.current_file && info.current_file !== 'Not detected');
+            lastLogFile = detected ? info.current_file : null;  // feeds the diagnostics check
             updateWelcomeModalStatus(detected);
         }
 
@@ -22253,7 +22254,9 @@ ${attemptLine}
                     if (msg.status) updatePartyStatus(msg.status);
                 }
                 else if (msg.type === 'party_recording_stopped') {
-                    // Server stopped recording - save final results to DB for persistence
+                    // Server stopped recording — the final post below is authoritative, so cancel
+                    // any pending live-hydration post.
+                    if (partyLiveHitDebounce) { clearTimeout(partyLiveHitDebounce); partyLiveHitDebounce = null; }
                     console.log('[Party] Recording stopped, final results:', msg.results);
                     if (msg.status) updatePartyStatus(msg.status);
                     
@@ -22289,10 +22292,31 @@ ${attemptLine}
                     if (msg.status) updatePartyStatus(msg.status);
                 }
                 else if (msg.type === 'party_live_hit') {
-                    // Post-combat model (Workstream B): we do NOT stream per-hit totals to the
-                    // party. The local server still emits these while recording; we ignore them
-                    // and post one consolidated result on combat-exit (party_recording_stopped).
-                    if (msg.data && msg.data.hit_count > 0) lastLogActivity = Date.now();
+                    // LIVE HYDRATION (Workstream B): the local server emits the running party
+                    // total on every ingested hit. T&L flushes the combat log in BURSTS at each
+                    // combat-exit, so these arrive as a burst then go quiet. Trailing-debounce to
+                    // coalesce each flush-burst into ONE post_fight of the current running total →
+                    // each member's row hydrates per combat-exit during the run. (Stop still sends
+                    // the final authoritative post.)
+                    lastLogActivity = Date.now();
+                    const totals = msg.totals;
+                    if (totals && totals.targets && totals.targets.length &&
+                        partyWS && partyWS.readyState === WebSocket.OPEN && partyState.party_code) {
+                        if (partyLiveHitDebounce) clearTimeout(partyLiveHitDebounce);
+                        partyLiveHitDebounce = setTimeout(() => {
+                            partyLiveHitDebounce = null;
+                            try {
+                                partyWS.send(JSON.stringify({
+                                    type: 'post_fight',
+                                    fight_ts: totals.fight_ts || Date.now(),
+                                    targets: totals.targets
+                                }));
+                                partyDebug('party.live_post', { targets: totals.targets.length });
+                            } catch (err) {
+                                partyDebug('party.live_post.error', { err: String(err) });
+                            }
+                        }, 1200);
+                    }
                 }
                 else if (msg.type === 'party_stats_reset') {
                     // Party stats were reset
@@ -22975,6 +22999,7 @@ ${attemptLine}
         let partyWSReconnect = null;   // reconnect timer
         let partyPingInterval = null;  // keepalive
         let expirationInterval = null; // expiration display timer
+        let partyLiveHitDebounce = null; // trailing-debounce timer for live hydration posts
 
         function startPartyPing() {
             stopPartyPing();
@@ -23318,6 +23343,7 @@ ${attemptLine}
         // === DIAGNOSTICS ===
         let diagnosticsOpen = false;
         let lastLogActivity = null;
+        let lastLogFile = null;  // actual detected combat-log file (from log_info), null if none
         
         function toggleDiagnostics() {
             diagnosticsOpen = !diagnosticsOpen;
@@ -23340,9 +23366,11 @@ ${attemptLine}
             updateDiagItem('diagServer', serverOk ? 'ok' : 'error', 'Server running');
             
             // 2. Combat log found (check if we have a log path configured)
-            const logPath = document.getElementById('logPath')?.value;
-            const logFound = logPath && logPath.length > 0 && !logPath.includes('not found');
-            updateDiagItem('diagLogFound', logFound ? 'ok' : 'error', 'Combat log found');
+            // Base this on the ACTUAL detected log file (from log_info / the sidebar's
+            // CURRENT FILE), not the manual log-path input — recording works off auto-detection.
+            const logFound = !!lastLogFile;
+            updateDiagItem('diagLogFound', logFound ? 'ok' : 'error',
+                logFound ? `Combat log: ${lastLogFile}` : 'Combat log found');
             
             // 3. Log file active (based on recent stats)
             const logActiveText = lastLogActivity ? `Active (${formatTimeAgo(lastLogActivity)})` : 'Log file active';
