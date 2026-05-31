@@ -25,7 +25,7 @@ wss://<host>/party/<CODE>?user_id=<id>&username=<name>&leader=<0|1>[&spectator=1
 **Client → room** (JSON text frames):
 | type | payload | meaning |
 |---|---|---|
-| `post_fight` | `{ v:2, fight_ts, targets:[...], summary, skills, rotation }` | post the full per-target breakdown for one completed fight (v2 envelope) |
+| `post_fight` | `{ v:2, fight_ts, encounter_id?, final?, targets:[...], summary, skills, rotation }` | post the full per-target breakdown for one completed fight (v2 envelope). `encounter_id` (Phase 2) names the segment; `final:true` files it |
 | `encounter_start` | — | leader-only: arm the party for a fresh pull (clears the board, broadcasts `encounter_start`) |
 | `encounter_end` | — | leader-only: signal everyone to stop recording + `post_fight` (broadcasts `encounter_end`) |
 | `clear` | — | leader-only: wipe the board for a fresh pull |
@@ -52,16 +52,19 @@ works (graceful rollout):
   ],
   "summary":  { "total_damage": 350000, "duration": 63 }, // opaque (overall top-level)
   "skills":   null,                 // Phase 3: per-skill array (stored opaquely until then)
-  "rotation": null                  // Phase 3: per-second buckets
+  "rotation": null,                 // Phase 3: per-second buckets
+  "encounter_id": "1735600000000",  // Phase 2 (A4): which segment; falls back to fight_ts
+  "final": false                    // Phase 2 (A4): true on the closing post of a segment
 }
 ```
 
 **Room → client** (JSON text frames):
 | type | payload |
 |---|---|
-| `welcome` | `{ v:2, you, roster:[...], scoreboard:{...}, encounter_active }` — sent to the joiner (announces protocol version) |
+| `welcome` | `{ v:2, you, roster:[...], scoreboard:{...}, encounters:[...], active_encounter_id, encounter_active }` — sent to the joiner (announces protocol version) |
 | `roster` | `{ members:[{user_id, username, is_leader, online}] }` |
 | `scoreboard` | `{ encounter_id, boss, boss_category, total_damage, updated_at, entries:[{rank, user_id, username, total_damage, dps, duration, hits, crit_rate, heavy_rate, contribution}] }` — the board for the **active** encounter |
+| `encounters` | `{ active_id, list:[{ encounter_id, boss, boss_category, started_at, ended, entries_n, total_damage }] }` — enumeration of all stored encounters (oldest-first) for the switcher; broadcast on any encounter create/update/close (Phase 2 / A4) |
 | `encounter_start` / `encounter_end` | `{ by, encounter_id }` — leader-relayed; clients arm/stop local recording |
 | `member_joined` / `member_left` / `member_offline` | `{ user_id, username? }` |
 | `pong` | — |
@@ -71,13 +74,27 @@ submissions and picks the boss = highest-aggregate-damage target (a `KNOWN_BOSSE
 preferred when present and supplies the `boss_category`). Everything that isn't the boss is
 trash → excluded from the board. (Phase-1: per-boss history/session view is Phase 2.)
 
-**Encounters (F1):** storage is keyed by encounter, not member —
+**Encounters (F1 + Phase 2/A4):** storage is keyed by encounter, not member —
 `encounters[encounter_id].submissions[user_id]`. `active_encounter_id` is the encounter incoming
 post_fights land in. The leader's `encounter_start` **files** the closing board (marks it `ended`,
-keeps it) and arms a fresh active encounter, broadcasting its `encounter_id` so every member files
-under the same id. If a post_fight arrives with no armed encounter (open-world, nobody pressed
-Start), the room **server-assigns** one (`encounter_autostart`). The room still broadcasts ONE (the
-active) `scoreboard`; the Phase-2 switcher will expose the filed encounters.
+keeps it) and arms a fresh active encounter, broadcasting its `encounter_id`.
+
+**Slotting precedence (A4)** — where a `post_fight` lands:
+1. **active encounter is open** (not `ended`) → slot here regardless of the post's `encounter_id`.
+   This merges a multi-PC board (every member's post joins the one open active encounter; a
+   continuous boss kill never crosses a boundary, so the active stays open the whole fight).
+2. else **honor the post's `encounter_id`** (create it if new, make it active) — the open-world /
+   solo path where the client gap-segments locally, so duplicate bosses & multi-boss runs become
+   distinct encounters.
+3. else **server-assign** one (`encounter_autostart`) — legacy client, no id, no active.
+
+A post flagged **`final:true`** marks its encounter `ended`, so the next fight rolls forward to a
+new encounter instead of merging. (Single-WS FIFO guarantees a `final(A)` arrives before the next
+encounter's `post(B)` on that socket, so B never pollutes A's board.)
+
+The room broadcasts the **active** `scoreboard` plus an **`encounters`** enumeration (all filed +
+active boards) for the Phase-2 switcher. Stored encounters are capped at **20** per room
+(`MAX_ENCOUNTERS`); the oldest (never the active) are evicted (`encounter_evicted`).
 
 ## Local dev (no Cloudflare account needed)
 ```

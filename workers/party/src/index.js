@@ -24,6 +24,9 @@
 
 const CODE_RE = /^[A-Z0-9]{4,8}$/;
 const MAX_MEMBERS = 12;
+// TTL/eviction (A4): cap stored encounters per room so a long raid night doesn't grow
+// unbounded; evict the oldest (never the active one) once over the cap.
+const MAX_ENCOUNTERS = 20;
 
 // Wire protocol version (F2). `welcome` announces it; `post_fight` carries it. A missing `v`
 // on an incoming post_fight = a legacy Phase-1 client (stored as v:1) — still slotted in, so an
@@ -155,6 +158,7 @@ export class PartyRoom {
         if (Array.isArray(msg.targets)) {
           await this.postFight(att.user_id, att.username, msg.fight_ts, msg.targets, msg);
           this.broadcast(await this.buildScoreboard());
+          this.broadcast(await this.buildEncounters());
         }
         return;
 
@@ -165,6 +169,7 @@ export class PartyRoom {
           if (id && encs[id]) { encs[id].submissions = {}; await this.ctx.storage.put("encounters", encs); }
           logEvent("clear", { by: att.username, user_id: att.user_id, encounter_id: id || null });
           this.broadcast(await this.buildScoreboard());
+          this.broadcast(await this.buildEncounters());
         }
         return;
 
@@ -181,6 +186,7 @@ export class PartyRoom {
           logEvent("encounter_start", { by: att.username, user_id: att.user_id, encounter_id: id });
           this.broadcast({ type: "encounter_start", by: att.username, encounter_id: id });
           this.broadcast(await this.buildScoreboard());
+          this.broadcast(await this.buildEncounters());
         }
         return;
 
@@ -192,6 +198,7 @@ export class PartyRoom {
           await this.ctx.storage.put("encounter_active", false);
           logEvent("encounter_end", { by: att.username, user_id: att.user_id, encounter_id: id || null });
           this.broadcast({ type: "encounter_end", by: att.username, encounter_id: id || null });
+          this.broadcast(await this.buildEncounters());
         }
         return;
 
@@ -200,6 +207,7 @@ export class PartyRoom {
         await this.removeMember(att.user_id);
         try { ws.close(1000, "left"); } catch (_) {}
         this.broadcast(await this.buildRoster());
+        this.broadcast(await this.buildEncounters());
         this.broadcastExcept(att.user_id, { type: "member_left", user_id: att.user_id });
         return;
     }
@@ -223,14 +231,39 @@ export class PartyRoom {
   }
 
   // --- state mutations ---
-  // Store this member's latest fight under the ACTIVE encounter. The room (not the client)
-  // decides which target is the boss at scoreboard-build time. If no encounter is armed (no
-  // leader pressed Start — e.g. open-world), the room server-assigns one (F1b fallback).
+  // Slot this member's latest fight into an encounter. SLOTTING PRECEDENCE (A4):
+  //   1. If the active encounter is OPEN (not `ended`) -> slot here regardless of the post's
+  //      own encounter_id. This is what merges a multi-PC board: in a coordinated party every
+  //      member's post lands in the one open active encounter, and a continuous boss kill has
+  //      no boundary so the active stays open the whole fight.
+  //   2. Else honor the post's `encounter_id` (create it if new, make it active). This is the
+  //      open-world / solo path where the client gap-segments locally: each segment posts a
+  //      distinct id, so duplicate bosses & multi-boss runs become distinct encounters.
+  //   3. Else (legacy client, no id, no active) the room server-assigns one (F1b fallback).
+  // A post flagged `final` (A3: the client closing a segment at a boundary) marks the encounter
+  // `ended`, so the NEXT fight rolls forward to a new encounter instead of merging. Single-WS
+  // FIFO guarantees a final(A) is delivered before the next encounter's post(B) on that socket,
+  // so B never pollutes A's board. The room (not the client) still picks the boss at build time.
   async postFight(user_id, username, fight_ts, targets, payload = {}) {
     const encs = await this._getEncounters();
-    let id = await this.ctx.storage.get("active_encounter_id");
-    if (!id || !encs[id]) {
-      id = String(Date.now()); // F1b fallback: server-assigned encounter (no leader-armed boundary)
+    const activeId = await this.ctx.storage.get("active_encounter_id");
+    const activeOpen = !!(activeId && encs[activeId] && !encs[activeId].ended);
+    const postedId = payload.encounter_id != null ? String(payload.encounter_id) : null;
+    const ts = Number(fight_ts) || Date.now();
+
+    let id;
+    if (activeOpen) {
+      id = activeId; // (1) merge into the open active encounter
+    } else if (postedId && encs[postedId]) {
+      id = postedId; // (2a) an existing encounter named by the client
+      if (!encs[postedId].ended) await this.ctx.storage.put("active_encounter_id", id);
+    } else if (postedId) {
+      id = postedId; // (2b) a fresh client-segmented encounter
+      encs[id] = { encounter_id: id, started_at: ts, ended: false, submissions: {} };
+      await this.ctx.storage.put("active_encounter_id", id);
+      logEvent("encounter_from_post", { encounter_id: id, by: user_id });
+    } else {
+      id = String(Date.now()); // (3) F1b fallback: server-assigned (no leader, no client id)
       encs[id] = { encounter_id: id, started_at: Date.now(), ended: false, submissions: {} };
       await this.ctx.storage.put("active_encounter_id", id);
       logEvent("encounter_autostart", { encounter_id: id, by: user_id });
@@ -258,13 +291,31 @@ export class PartyRoom {
       skills: payload.skills ?? null,
       rotation: payload.rotation ?? null,
     };
+    // Client closing a segment at a boundary -> file the encounter so the next fight rolls
+    // forward to a new one instead of merging into this (now-finished) board.
+    if (payload.final) encs[id].ended = true;
+    this._evictOldEncounters(encs, id);
     await this.ctx.storage.put("encounters", encs);
     logEvent("post_fight", {
-      user_id, username, v, encounter_id: id,
+      user_id, username, v, encounter_id: id, final: !!payload.final,
       fight_ts: encs[id].submissions[user_id].fight_ts,
       n_targets: encs[id].submissions[user_id].targets.length,
       has_skills: encs[id].submissions[user_id].skills != null,
     });
+  }
+
+  // TTL/eviction (A4): drop the oldest encounters once over the cap, never the one just
+  // touched (`keepId`). Mutates `encs` in place; caller persists.
+  _evictOldEncounters(encs, keepId) {
+    let ids = Object.keys(encs);
+    if (ids.length <= MAX_ENCOUNTERS) return;
+    ids.sort((a, b) => (encs[a].started_at || 0) - (encs[b].started_at || 0)); // oldest first
+    for (const id of ids) {
+      if (Object.keys(encs).length <= MAX_ENCOUNTERS) break;
+      if (id === keepId) continue;
+      delete encs[id];
+      logEvent("encounter_evicted", { encounter_id: id });
+    }
   }
 
   async removeMember(user_id) {
@@ -358,6 +409,37 @@ export class PartyRoom {
     };
   }
 
+  // Enumeration of every stored encounter for the UI switcher (A4). One lightweight entry per
+  // encounter (boss label via the same server-side detection, sorted oldest-first), plus which
+  // id is active. Broadcast on welcome and whenever an encounter is created/updated/closed.
+  async buildEncounters() {
+    const encs = await this._getEncounters();
+    const active_id = (await this.ctx.storage.get("active_encounter_id")) || null;
+    const list = Object.values(encs).map((e) => {
+      const subs = Object.values(e.submissions || {});
+      const boss = this.detectBoss(subs);
+      let total_damage = 0;
+      if (boss) {
+        const bk = norm(boss.name);
+        for (const s of subs) {
+          const hit = s.targets.find((t) => norm(t.target) === bk);
+          if (hit) total_damage += hit.total_damage;
+        }
+      }
+      return {
+        encounter_id: e.encounter_id,
+        boss: boss ? boss.name : null,
+        boss_category: boss ? boss.category : null,
+        started_at: e.started_at || 0,
+        ended: !!e.ended,
+        entries_n: subs.length,
+        total_damage,
+      };
+    });
+    list.sort((a, b) => a.started_at - b.started_at);
+    return { type: "encounters", active_id, list };
+  }
+
   async buildRoster() {
     const members = (await this.ctx.storage.get("members")) || {};
     const online = new Set(
@@ -377,8 +459,15 @@ export class PartyRoom {
   async snapshot() {
     const roster = await this.buildRoster();
     const scoreboard = await this.buildScoreboard(); // active encounter
+    const encounters = await this.buildEncounters();
     const encounter_active = !!(await this.ctx.storage.get("encounter_active"));
-    return { roster: roster.members, scoreboard, encounter_active };
+    return {
+      roster: roster.members,
+      scoreboard,
+      encounters: encounters.list,
+      active_encounter_id: encounters.active_id,
+      encounter_active,
+    };
   }
 
   // --- broadcast helpers ---
