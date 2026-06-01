@@ -731,9 +731,10 @@ async def run_multiboss(host: str, code: str, members_n: int, delay: float,
 SCENARIOS = {
     "merge-two-players": """
 Two bots, SAME boss, DIFFERENT fight_ts (7s apart).
-Expected: worker creates TWO encounter rows (no merge) because the encounter key
-differs.  This DOCUMENTS THE CURRENT MERGE REGRESSION — the bug we're chasing.
-When the regression is fixed, the assertion should be flipped to expect 1 row.
+Expected: worker merges both posts onto ONE encounter row via proximity-window merge.
+The first poster's fight_ts becomes the canonical encounter id; the second poster's
+fight_ts is redirected via encounter_id_map so their final_detail lands on the same
+row (drill-down reachable on the merged board).
 """,
     "crit-heavy-parity": """
 Assert that posted crit_rate / heavy_rate / crit_heavy_rate match what
@@ -768,8 +769,8 @@ async def run_scenario(
     # ------------------------------------------------------------------
     if name == "merge-two-players":
         print(f"SCENARIO: merge-two-players -> {host}/party/{code}")
-        print("  Two bots, same boss ('Tevent'), DIFFERENT fight_ts.")
-        print("  Expectation (current regression): TWO encounter rows, NOT merged.")
+        print("  Two bots, same boss ('Tevent'), DIFFERENT fight_ts (7s apart).")
+        print("  Expectation (FIXED): ONE merged encounter row.")
 
         ts1 = base_ts
         ts2 = base_ts + 7_000  # 7s offset -> distinct key
@@ -792,13 +793,13 @@ async def run_scenario(
             print(f"    post_fight:  {json.dumps({k: v for k, v in frame1.items() if k not in ('targets','skills','rotation')})}")
             print(f"    targets[0]:  {frame1['targets'][0]}")
             print(f"    final_detail encounter_id={fd1['encounter_id']}")
-            print(f"  Bot2 fight_ts={ts2}  (DIFFERENT -> separate encounter row)")
+            print(f"  Bot2 fight_ts={ts2}  (7s DIFFERENT -> should MERGE onto Bot1 encounter)")
             print(f"    post_fight:  {json.dumps({k: v for k, v in frame2.items() if k not in ('targets','skills','rotation')})}")
             print(f"    targets[0]:  {frame2['targets'][0]}")
             check(ts1 != ts2, "fight_ts values are distinct (7s apart)")
             check(frame1["encounter_id"] != frame2["encounter_id"],
-                  "encounter_id strings differ")
-            print("\nDRY-RUN NOTE: connect to wrangler dev + run live to assert 2-row outcome.")
+                  "encounter_id strings differ (merge happens server-side)")
+            print("\nDRY-RUN NOTE: connect to wrangler dev + run live to assert 1-row merged outcome.")
             return 0 if ok else 1
 
         if not _HAS_WS:
@@ -836,13 +837,18 @@ async def run_scenario(
 
         lst = encs["list"]
         got_ids = [e.get("encounter_id") for e in lst]
-        # REGRESSION ASSERTION: currently produces 2 rows because fight_ts differ.
-        # When the merge bug is FIXED, change this to check len == 1.
-        check(len(lst) == 2,
-              f"merge regression: 2 encounter rows (different fight_ts = no merge); "
-              f"got {len(lst)} -- if FIXED flip to 1")
-        check(str(ts1) in got_ids and str(ts2) in got_ids,
-              f"both encounter_ids present: {got_ids}")
+        # FIXED: proximity-window merge means both posts land on ONE encounter row.
+        # The canonical id is the first poster's fight_ts (ts1); ts2 is redirected via
+        # encounter_id_map so its final_detail also lands on the merged row.
+        check(len(lst) == 1,
+              f"merge fixed: exactly 1 encounter row (both fight_ts merged); "
+              f"got {len(lst)}")
+        check(str(ts1) in got_ids,
+              f"canonical encounter_id is ts1={ts1}; got {got_ids}")
+        # Verify the merged board has both members' submissions.
+        merged_entries = lst[0].get("entries_n", 0) if lst else 0
+        check(merged_entries == 2,
+              f"merged encounter has 2 member submissions; got {merged_entries}")
         # Verify crit_heavy in the targets posted (parity check inline).
         t = tgts1[0]
         check("crit_heavy_rate" in t, "crit_heavy_rate field present in targets")

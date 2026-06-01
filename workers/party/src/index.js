@@ -30,6 +30,14 @@ const MAX_MEMBERS = 12;
 // so it never runs on an idle room.
 const GHOST_EVICT_MS = 5 * 60 * 1000; // 5 minutes
 
+// Merge window for concurrent same-boss submissions. Party members start combat a few seconds
+// apart (different fight_ts) → their posts would otherwise create separate 1-person boards.
+// When there is an OPEN active encounter and an incoming post's fight_ts is within this window
+// of the active encounter's started_at, we merge it onto the active encounter rather than
+// creating a new one. 30 s is generous: real party members stagger combat starts by ≤ a few
+// seconds; a genuine wipe/retry has a much larger gap (travel time + respawn > 60 s).
+const MERGE_WINDOW_MS = 30_000; // 30 seconds
+
 // Wire protocol version (F2). `welcome` announces it; `post_fight` carries it. A missing `v`
 // on an incoming post_fight = a legacy Phase-1 client (stored as v:1) — still slotted in, so an
 // un-updated installed app keeps working during rollout. The post_fight envelope is
@@ -259,8 +267,26 @@ export class PartyRoom {
       // over the WS of the member whose detail this is.  We write the detail blob onto the
       // EXISTING encounter row (identified by fight_ts) without creating a new encounter.
       // `encounter_id` MUST equal the fight_ts string the backend used when posting frames.
+      // MERGE RESOLUTION: when this member's post_fight was merged onto a different (earlier)
+      // active encounter, encounter_id_map holds the redirect from their fight_ts to the
+      // canonical encounter id — we resolve through the map so has_detail lands on the board
+      // row that is actually displayed, making drill-down reachable.
       case "final_detail": {
-        const eid = msg.encounter_id != null ? String(msg.encounter_id) : null;
+        const rawEid = msg.encounter_id != null ? String(msg.encounter_id) : null;
+        let eid = rawEid;
+        if (eid) {
+          this._ensureTables();
+          // Resolve through the merge-redirect map (no-op if this member wasn't merged).
+          const mapRows = [...this.ctx.storage.sql.exec(
+            "SELECT canonical_id FROM encounter_id_map WHERE posted_id = ?", eid
+          )];
+          if (mapRows.length) {
+            eid = mapRows[0].canonical_id;
+            logEvent("final_detail_redirected", {
+              posted_id: rawEid, canonical_id: eid, user_id: att.user_id,
+            });
+          }
+        }
         if (eid && msg.detail != null) {
           this._ensureTables();
           // Confirm the encounter row exists before writing — never create a new one.
@@ -452,6 +478,16 @@ export class PartyRoom {
     this.ctx.storage.sql.exec(
       "CREATE TABLE IF NOT EXISTS member_detail (encounter_id TEXT, user_id TEXT, blob TEXT, PRIMARY KEY (encounter_id, user_id))"
     );
+    // Merge-redirect map: when a post's fight_ts is absorbed into an already-open active
+    // encounter (concurrent same-boss submissions), record posted_id -> canonical_id so that
+    // the subsequent final_detail frame (which carries the member's own fight_ts as
+    // encounter_id) is written to the correct canonical encounter row instead of being dropped.
+    this.ctx.storage.sql.exec(
+      `CREATE TABLE IF NOT EXISTS encounter_id_map (
+        posted_id   TEXT PRIMARY KEY,
+        canonical_id TEXT NOT NULL
+      )`
+    );
     this._tablesReady = true;
   }
 
@@ -493,15 +529,24 @@ export class PartyRoom {
   }
 
   // --- state mutations ---
-  // Slot this member's latest fight into an encounter. SLOTTING PRECEDENCE (contract item 1+2):
-  //   1. The canonical encounter key is ALWAYS `fight_ts` (the real fight-start timestamp from
-  //      the backend). The worker NEVER mints a click-time Date.now() id as the encounter key.
-  //   2. If a post carries `encounter_id` (= fight_ts), that IS the key — look it up or create it.
-  //   3. If there is already an OPEN active encounter AND the post's fight_ts matches it, merge
-  //      (multi-PC party convergence: all members' posts for the same fight share the same key).
-  //   4. Legacy fallback (no fight_ts, no encounter_id): use String(fight_ts || Date.now()) so
-  //      old clients still get bucketed rather than crashing, but this path should not be hit by
-  //      any v2+ client.
+  // Slot this member's latest fight into an encounter. SLOTTING PRECEDENCE (contract items 1-4):
+  //   1. The canonical encounter key is ALWAYS the FIRST member's fight_ts that started the
+  //      encounter. The worker NEVER mints a click-time Date.now() id as the encounter key.
+  //   2. PROXIMITY MERGE (the key fix): if there is an OPEN (not ended) active encounter and the
+  //      incoming post's fight_ts is within MERGE_WINDOW_MS of that encounter's started_at, merge
+  //      it onto the active encounter regardless of whether the exact fight_ts matches. This covers
+  //      the common case where party members engage the same boss a few seconds apart — each member's
+  //      local fight_ts differs, but they're all fighting the same encounter. A mapping of
+  //      (postedId → canonical active id) is written to encounter_id_map so that the subsequent
+  //      final_detail frame for that member (which carries their own fight_ts as encounter_id) is
+  //      written to the CORRECT encounter row. This is what makes drill-down reachable on the
+  //      merged board.
+  //   3. If the active encounter is ENDED, or the time gap exceeds MERGE_WINDOW_MS, honor the
+  //      posted encounter_id (= fight_ts) to create/activate a new encounter. This preserves
+  //      --multiboss behavior (distinct bosses stay distinct rows) and wipe/retry segmentation
+  //      (the same boss re-engaged after a large gap gets a fresh encounter).
+  //   4. Legacy fallback (no fight_ts, no encounter_id): server-assign using wall clock. Should
+  //      only be hit by pre-v2 clients; v2+ always carry fight_ts.
   // A post flagged `final` marks the encounter `ended` so the NEXT fight creates a new row.
   // The room (not the client) still picks the boss at build time.
   async postFight(user_id, username, fight_ts, targets, payload = {}) {
@@ -523,27 +568,63 @@ export class PartyRoom {
 
     const activeId = await this.ctx.storage.get("active_encounter_id");
 
-    // Check if the active encounter is open (not ended) without loading all submissions.
-    let activeEnded = true;
+    // Check if the active encounter exists and get its started_at for proximity check.
+    // NOTE: we intentionally do NOT gate on `ended` here — concurrent members post `final:true`
+    // at nearly the same time. The first one closes the encounter; subsequent members from the
+    // same fight arrive moments later and should still merge in, not create orphan rows.
+    // The wipe/retry guard (preventing re-merge after a genuine new encounter) comes from the
+    // time-proximity window: a real wipe + re-engage is >> MERGE_WINDOW_MS away.
+    let activeStartedAt = 0;
     if (activeId) {
-      const rows = [...this.ctx.storage.sql.exec("SELECT ended FROM encounters WHERE id = ?", activeId)];
-      activeEnded = !rows.length || !!rows[0].ended;
+      const rows = [...this.ctx.storage.sql.exec(
+        "SELECT started_at FROM encounters WHERE id = ?", activeId
+      )];
+      if (rows.length) {
+        activeStartedAt = rows[0].started_at || 0;
+      }
     }
-    // Merge into the open active encounter ONLY if the fight_ts matches (same fight).
-    // If the posted id differs from the active id it's a NEW fight — don't merge across fights.
-    const activeOpen = !!(activeId && !activeEnded && postedId && activeId === postedId);
+
+    // Proximity merge: merge into the most-recent active encounter when the fight_ts is within
+    // MERGE_WINDOW_MS of that encounter's started_at. This covers the common case where party
+    // members start combat a few seconds apart — each member's local fight_ts differs but they
+    // are all on the same boss. Works even when the first member's final:true has already closed
+    // the encounter, because concurrent same-boss finals arrive within seconds.
+    // Exact-match (activeId === postedId) is the single-machine / same-ts case — always merge.
+    // A genuinely new boss or wipe/retry has a gap >> MERGE_WINDOW_MS from the last started_at.
+    const withinWindow = ts > 0 && activeStartedAt > 0
+      && Math.abs(ts - activeStartedAt) <= MERGE_WINDOW_MS;
+    const shouldMerge = !!(activeId && postedId && (activeId === postedId || withinWindow));
 
     let id;
-    if (activeOpen) {
-      id = activeId; // (1) merge — same fight_ts, active encounter is still open
+    if (shouldMerge) {
+      id = activeId; // (1)/(2) merge — same fight or within proximity window
+      // If this member posted a different fight_ts, record the redirect so their final_detail
+      // frame (which carries their own fight_ts as encounter_id) resolves to the canonical id.
+      if (postedId && postedId !== activeId) {
+        this.ctx.storage.sql.exec(
+          "INSERT OR REPLACE INTO encounter_id_map (posted_id, canonical_id) VALUES (?, ?)",
+          postedId, activeId
+        );
+        logEvent("encounter_merge", {
+          posted_id: postedId, canonical_id: activeId, by: user_id,
+          fight_ts: ts, active_started_at: activeStartedAt,
+          delta_ms: Math.abs(ts - activeStartedAt),
+        });
+      }
+      // If the encounter was already ended (concurrent final:true from another member), reopen
+      // it so this member's data lands and the final from THIS member can close it cleanly.
+      // The ended flag will be set again when this post's final:true is processed below.
+      this.ctx.storage.sql.exec(
+        "UPDATE encounters SET ended = 0 WHERE id = ? AND ended = 1", id
+      );
     } else if (postedId) {
-      // Check if this encounter exists already
+      // Check if this encounter exists already (e.g. a second post from the same member).
       const existing = [...this.ctx.storage.sql.exec("SELECT ended FROM encounters WHERE id = ?", postedId)];
       if (existing.length) {
-        id = postedId; // (2a) existing encounter named by fight_ts
+        id = postedId; // (3a) existing encounter named by fight_ts
         if (!existing[0].ended) await this.ctx.storage.put("active_encounter_id", id);
       } else {
-        id = postedId; // (2b) lazy-create: first submission for this fight_ts
+        id = postedId; // (3b) lazy-create: first submission for this fight_ts
         this.ctx.storage.sql.exec(
           "INSERT OR REPLACE INTO encounters (id, started_at, ended) VALUES (?, ?, 0)",
           id, ts
@@ -552,7 +633,7 @@ export class PartyRoom {
         logEvent("encounter_from_fight_ts", { encounter_id: id, fight_ts: ts, by: user_id });
       }
     } else {
-      // (3) Legacy fallback: no fight_ts, no encounter_id — server-assign using wall clock.
+      // (4) Legacy fallback: no fight_ts, no encounter_id — server-assign using wall clock.
       // Should only be hit by pre-v2 clients; v2+ always carry fight_ts.
       id = String(Date.now());
       this.ctx.storage.sql.exec(
