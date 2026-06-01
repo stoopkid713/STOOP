@@ -124,6 +124,10 @@ class DPSMeterServer:
         # which the 0.5s broadcast reads on every tick).
         self.config = p.load_config(self.data_dir)
         self.skill_settings = p.load_skill_settings(self.data_dir)
+        # Fix 3 — NAME DETECT re-emit: track the last-seen log current_file so the
+        # broadcast loop can push a fresh suggested_names message the moment a new
+        # combat-log file first appears (e.g. the user enabled logging after launch).
+        self._last_log_file: Optional[str] = None
 
     # --- lifecycle ---------------------------------------------------------
     async def start(self) -> "DPSMeterServer":
@@ -232,8 +236,32 @@ class DPSMeterServer:
                 self._check_party_idle()
                 if self.clients:
                     await self._broadcast(self._stats_envelope())
+                    # Fix 3 — NAME DETECT re-emit: if a new combat-log file has
+                    # appeared since the last tick, push fresh suggested_names so
+                    # the party name-picker populates even when the user enables
+                    # combat logging after the app was already open.
+                    self._maybe_reemit_suggested_names()
         except asyncio.CancelledError:
             raise
+
+    def _maybe_reemit_suggested_names(self) -> None:
+        """Re-broadcast suggested_names when the active log file first changes.
+
+        Compares the current ``_log_info`` ``current_file`` to the last-seen value.
+        When it differs (a new log file appeared or the log path was first resolved)
+        we emit a fresh ``suggested_names`` message to all connected clients so the
+        party name-picker reflects the new log even if get_suggested_names was already
+        answered with an empty list at connect time.
+        """
+        info = self._log_info()
+        current = info.get("current_file")
+        if current != self._last_log_file:
+            self._last_log_file = current
+            if current is not None and self.clients:
+                # Re-run the full name-scan now that a log file is present.
+                payload = _h_get_suggested_names(self, {})
+                self._emit(payload)
+                log.debug("re-emitted suggested_names after log file change: %s", current)
 
     def _check_party_idle(self) -> None:
         """Close the active party encounter if combat has been silent long enough.

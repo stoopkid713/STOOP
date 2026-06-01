@@ -321,7 +321,16 @@ def main() -> None:
         height=800,
     )
     try:
-        webview.start()  # BLOCKS the main thread until the window is closed
+        # Persist localStorage (and cookies) across launches so the frontend's
+        # stable user_id survives a relaunch.  Without this pywebview's default
+        # private_mode=True wipes the webview storage on every close, causing the
+        # frontend to regenerate a new user_id → the party room sees a ghost member.
+        webview_storage = data_dir / "webview"
+        webview_storage.mkdir(parents=True, exist_ok=True)
+        webview.start(
+            private_mode=False,
+            storage_path=str(webview_storage),
+        )  # BLOCKS the main thread until the window is closed
     finally:
         backend.stop()
         log.info("backend stopped — exiting")

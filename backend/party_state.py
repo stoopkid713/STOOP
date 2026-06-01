@@ -32,6 +32,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Optional
 
+from combat_stats import build_stat_block
 from encounter_boundary import is_new_encounter
 
 
@@ -117,23 +118,39 @@ class PartyEncounter:
             return empty
         duration = self.duration()
         total_damage = self.total_damage()
+        # Index hits by target once for the per-target stat-block pass below.
+        hits_by_target: dict[str, list[dict]] = defaultdict(list)
+        for h in self.hits:
+            hits_by_target[h["target"]].append(h)
+
         targets = []
         for target, stats in self.target_damage.items():
             damage = stats["damage"]
-            hits = stats["hits"]
-            crits = stats["crits"]
-            heavies = stats["heavies"]
-            crit_rate = (crits / hits * 100) if hits > 0 else 0
-            heavy_rate = (heavies / hits * 100) if hits > 0 else 0
+            raw_hits = stats["hits"]
             dps = (damage / duration) if duration > 0 else 0
+            # Route rates through build_stat_block so party == solo (same adjusted
+            # crit/heavy logic, plus the combined crit_heavy stat the solo meter
+            # produces).  Skill settings are not available per-member in the party
+            # path today (no skill_settings arg here), so adjusted == raw — which
+            # matches the scenario verified by sim_party --scenario crit-heavy-parity.
+            target_hits = hits_by_target.get(target, [])
+            sb = build_stat_block(target_hits) if target_hits else {}
+            # crit_heavy_count: hits where BOTH flags are True (the same numerator
+            # build_stat_block uses for crit_heavy_rate, exposed separately for the
+            # pinned post_fight contract the screens lane renders).
+            crit_heavy_count = sum(
+                1 for h in target_hits if h["is_crit"] and h["is_heavy"]
+            )
             targets.append({
                 "target": target,
                 "total_damage": damage,
                 "duration": round(duration, 1),
                 "dps": round(dps, 1),
-                "hits": hits,
-                "crit_rate": round(crit_rate, 1),
-                "heavy_rate": round(heavy_rate, 1),
+                "hits": raw_hits,
+                "crit_rate": sb.get("crit_rate", 0.0),
+                "heavy_rate": sb.get("heavy_rate", 0.0),
+                "crit_heavy_rate": sb.get("crit_heavy_rate", 0.0),
+                "crit_heavy_count": crit_heavy_count,
             })
         out = {
             "targets": targets,
