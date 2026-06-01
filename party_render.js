@@ -47,6 +47,72 @@ const PartyRender = {
     return d.innerHTML;
   },
 
+  // ===== Fix #4/#9/#10 — shared scoreboard row renderer =====
+  // Renders a full stats row for one scoreboard entry (base + overlay).
+  // ``entry`` shape: {rank, user_id, username, total_damage, dps, hits, duration,
+  //   crit_rate, heavy_rate, crit_heavy_rate, crit_heavy_count, contribution}
+  // ``opts``: {isYou, color:{bg,text}, drillAttrs, compact}
+  scoreboardRowHtml(entry, totalDamage, opts) {
+    opts = opts || {};
+    const e = entry || {};
+    const esc = PartyRender.escapeHtml;
+    const pct = (typeof e.contribution === 'number') ? e.contribution
+      : (totalDamage > 0 ? (e.total_damage / totalDamage * 100) : 0);
+    const rank = e.rank || 1;
+    const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+    const safeName = esc(e.username || '?');
+    const color = opts.color || { bg: 'rgba(34,211,238,0.25)', text: '#22d3ee' };
+    const isYou = !!opts.isYou;
+    // Drill-down: build onclick/class attrs if supplied. drillAttrs is a partial attr string.
+    const drillAttrs = opts.drillAttrs || '';
+    const dps   = PartyRender.fmtNum(Math.round(e.dps || 0));
+    const dmg   = PartyRender.fmtNum(e.total_damage || 0);
+    const hits  = e.hits || 0;
+    const avgHit = hits > 0 ? PartyRender.fmtNum(Math.round((e.total_damage || 0) / hits)) : '—';
+    const critR  = ((e.crit_rate  || 0)).toFixed(1);
+    const heavyR = ((e.heavy_rate || 0)).toFixed(1);
+    const chR    = ((e.crit_heavy_rate || 0)).toFixed(1);
+    const chCount = e.crit_heavy_count || 0;
+
+    if (opts.compact) {
+      // Overlay: tighter row — rank · name · % · dmg · dps · crit% · heavy%
+      return '<div class="party-result-row ' + rankClass + (drillAttrs ? ' party-result-clickable' : '') + '"' + drillAttrs + '>'
+        + '<div class="party-result-rank ' + rankClass + '">' + rank + '</div>'
+        + '<div class="party-result-bar-container">'
+        + '<div class="party-result-bar" style="width:' + pct.toFixed(1) + '%;background:' + color.bg + ';border-left:3px solid ' + color.text + ';"></div>'
+        + '<div class="party-result-info">'
+        + '<span class="party-result-name"><span style="color:' + color.text + ';">' + safeName + '</span>'
+        + (isYou ? '<span class="party-result-you">YOU</span>' : '') + '</span>'
+        + '<span class="party-result-stats">'
+        + '<span class="party-result-percent">' + pct.toFixed(1) + '%</span>'
+        + '<span class="party-result-dps">' + dps + ' DPS</span>'
+        + '<span class="party-result-damage">' + dmg + '</span>'
+        + '<span class="party-result-crit">' + critR + '% C</span>'
+        + '<span class="party-result-heavy">' + heavyR + '% H</span>'
+        + '</span></div></div></div>';
+    }
+
+    // Base (full): rank · bar · name · % · DPS · total · hits · avg · crit% · heavy% · C+H%
+    return '<div class="party-result-row ' + rankClass + (drillAttrs ? ' party-result-clickable' : '') + '"' + drillAttrs + '>'
+      + '<div class="party-result-rank ' + rankClass + '">' + rank + '</div>'
+      + '<div class="party-result-bar-container">'
+      + '<div class="party-result-bar" style="width:' + pct.toFixed(1) + '%;background:' + color.bg + ';border-left:3px solid ' + color.text + ';"></div>'
+      + '<div class="party-result-info">'
+      + '<span class="party-result-name"><span style="color:' + color.text + ';">' + safeName + '</span>'
+      + (isYou ? '<span class="party-result-you">YOU</span>' : '') + '</span>'
+      + '<span class="party-result-stats">'
+      + '<span class="party-result-percent">' + pct.toFixed(1) + '%</span>'
+      + '<span class="party-result-rates">'
+      + '<span class="party-result-crit" title="Crit rate">' + critR + '% C</span>'
+      + '<span class="party-result-heavy" title="Heavy rate">' + heavyR + '% H</span>'
+      + '<span class="party-result-critheavy" title="Crit+Heavy rate (' + chCount + ' hits)">' + chR + '% C+H</span>'
+      + '</span>'
+      + '<span class="party-result-dps">' + dps + ' DPS</span>'
+      + '<span class="party-result-damage">' + dmg + '</span>'
+      + '<span class="party-result-hits" title="Hits · Avg hit">' + hits + ' hits · ' + avgHit + ' avg</span>'
+      + '</span></div></div></div>';
+  },
+
   // ===== Phase 3 / C2 — shared member-drill-down render (skill table + rotation) =====
   // Both surfaces feed these the raw ``rotation`` hit list the room serves via
   // ``get_member_detail`` (solo-hit shape: {relative_time, skill, damage, is_crit,

@@ -125,42 +125,17 @@
             const encId = sb.encounter_id;
 
             const rowsHtml = entries.map((e) => {
-                const pct = (typeof e.contribution === 'number') ? e.contribution
-                    : (totalDamage > 0 ? (e.total_damage / totalDamage * 100) : 0);
-                const rank = e.rank || 1;
-                const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
                 const isYou = e.user_id === partyState.user_id;
                 const color = getPlayerColor(e.user_id);
-                const safeName = escapeHtml(e.username);
-                // C3: rows with stored per-hit detail (has_detail from the room) are drillable.
-                const drill = !!e.has_detail;
-                const drillAttrs = drill
-                    ? ` party-result-clickable" onclick="openPartyMemberDetail('${encId}','${e.user_id}')" title="View skill breakdown`
-                    : '';
-
-                return `
-                    <div class="party-result-row ${rankClass}${drillAttrs}">
-                        <div class="party-result-rank ${rankClass}">${rank}</div>
-                        <div class="party-result-bar-container">
-                            <div class="party-result-bar" style="width: ${pct.toFixed(1)}%; background: ${color.bg}; border-left: 3px solid ${color.text};"></div>
-                            <div class="party-result-info">
-                                <span class="party-result-name">
-                                    <span style="color: ${color.text};">${safeName}</span>
-                                    ${isYou ? '<span class="party-result-you">YOU</span>' : ''}
-                                </span>
-                                <span class="party-result-stats">
-                                    <span class="party-result-percent">${pct.toFixed(1)}%</span>
-                                    <span class="party-result-rates">
-                                        <span class="party-result-crit">${(e.crit_rate || 0).toFixed(0)}% C</span>
-                                        <span class="party-result-heavy">${(e.heavy_rate || 0).toFixed(0)}% H</span>
-                                    </span>
-                                    <span class="party-result-dps">${formatNumber(Math.round(e.dps || 0))} DPS</span>
-                                    <span class="party-result-damage">${formatNumber(e.total_damage || 0)}</span>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                // Fix #2: ALL rows are always clickable — no has_detail gate.
+                // On click we request get_member_detail and show a loading state until it arrives.
+                const drillAttrs = ` onclick="openPartyMemberDetail('${encId}','${e.user_id}')" title="View skill breakdown"`;
+                return PartyRender.scoreboardRowHtml(e, totalDamage, {
+                    isYou: isYou,
+                    color: color,
+                    drillAttrs: drillAttrs,
+                    compact: false,
+                });
             }).join('');
 
             container.innerHTML = `
@@ -238,9 +213,10 @@
         }
 
         // ===== Phase 3 (C4) — tab renderers (Skills / Rotation / Compare / History) =====
-        // Build the <option> list of drillable members on the viewed board (those with has_detail).
+        // Build the <option> list of all members on the viewed board.
+        // Fix #2: no longer filtered to has_detail — all members are drillable (detail fetched on click).
         function partyMemberOptions(board, selected) {
-            const entries = (board && Array.isArray(board.entries)) ? board.entries.filter((e) => e.has_detail) : [];
+            const entries = (board && Array.isArray(board.entries)) ? board.entries : [];
             const opts = ['<option value="">— pick member —</option>'].concat(
                 entries.map((e) => `<option value="${escapeHtml(e.user_id)}"${e.user_id === selected ? ' selected' : ''}>${escapeHtml(e.username)}</option>`)
             );
@@ -251,7 +227,8 @@
         function renderPartySingleMemberTab(kind) {
             const container = document.getElementById('partyResultsContainer');
             const board = currentPartyBoard();
-            const entries = (board && Array.isArray(board.entries)) ? board.entries.filter((e) => e.has_detail) : [];
+            // Fix #2: show all members (not just has_detail); detail is fetched on demand.
+            const entries = (board && Array.isArray(board.entries)) ? board.entries : [];
             const sel = partyState[kind === 'skills' ? 'skillsMember' : 'rotationMember'];
             // Default to the top (rank-1) drillable member.
             const chosen = (sel && entries.some((e) => e.user_id === sel)) ? sel : (entries[0] && entries[0].user_id) || null;
@@ -291,9 +268,10 @@
         function renderPartyCompareTab() {
             const container = document.getElementById('partyResultsContainer');
             const board = currentPartyBoard();
-            const entries = (board && Array.isArray(board.entries)) ? board.entries.filter((e) => e.has_detail) : [];
+            // Fix #2: show all members; detail fetched on demand.
+            const entries = (board && Array.isArray(board.entries)) ? board.entries : [];
             if (entries.length < 2) {
-                container.innerHTML = `<div class="party-empty-state"><div class="party-empty-icon">⚖️</div><div class="party-empty-text">Need at least two members with detailed data to compare.</div></div>`;
+                container.innerHTML = `<div class="party-empty-state"><div class="party-empty-icon">⚖️</div><div class="party-empty-text">Need at least two members to compare.</div></div>`;
                 return;
             }
             const encId = board.encounter_id;
@@ -329,7 +307,8 @@
             // Avoid comparing a member with themselves — bump the other slot if they collide.
             if (partyState.compare.a && partyState.compare.a === partyState.compare.b) {
                 const board = currentPartyBoard();
-                const entries = (board && Array.isArray(board.entries)) ? board.entries.filter((e) => e.has_detail) : [];
+                // Fix #2: no has_detail filter — all members are drillable.
+                const entries = (board && Array.isArray(board.entries)) ? board.entries : [];
                 const other = entries.find((e) => e.user_id !== userId);
                 if (other) partyState.compare[slot === 'a' ? 'b' : 'a'] = other.user_id;
             }

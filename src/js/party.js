@@ -240,6 +240,25 @@
                 case 'member_offline':
                     // Roster is refreshed by the room's separate `roster` broadcast.
                     break;
+                case 'member_kicked':
+                    // Fix #7: Room broadcasts this when a member is kicked; update local roster.
+                    if (m.user_id === partyState.user_id) {
+                        // We were kicked — leave gracefully.
+                        alert('You have been kicked from the party.');
+                        partyWSWantOpen = false;
+                        disconnectPartyWS();
+                        partyState.connected = false;
+                        partyState.party_code = null;
+                        partyState.is_leader = false;
+                        partyState.roster = [];
+                        updatePartyUI();
+                    } else {
+                        // Remove the kicked member from the local roster and re-render.
+                        partyState.roster = partyState.roster.filter((r) => r.user_id !== m.user_id);
+                        renderPartyMembers();
+                    }
+                    partyDebug('party.member_kicked', { user_id: m && m.user_id });
+                    break;
                 case 'member_detail': {
                     // Phase 3 (C3): lazy drill-down payload for one (encounter, member).
                     // Cache it; re-render the panel only if it's the member we're viewing.
@@ -271,7 +290,13 @@
             // Only surface chips while the name FORM is visible (i.e. no name chosen yet).
             const area = document.getElementById('partyNameArea');
             const formVisible = area && area.style.display !== 'none';
-            if (!partySuggestedNames.length || !formVisible) { wrap.style.display = 'none'; return; }
+            if (!formVisible) { wrap.style.display = 'none'; return; }
+            // Fix #13: always show the detect button when the form is visible, even with no names.
+            if (!partySuggestedNames.length) {
+                wrap.style.display = 'flex';
+                ensureDetectNamesButton(wrap);
+                return;
+            }
             chips.innerHTML = partySuggestedNames.map((n) =>
                 `<button type="button" class="party-name-chip" data-name="${escapeHtml(n)}" onclick="pickPartyName(this.dataset.name)" `
                 + `style="margin:2px 4px 2px 0; padding:3px 9px; font-size:12px; border-radius:11px; `
@@ -279,10 +304,33 @@
                 + `${escapeHtml(n)}</button>`
             ).join('');
             wrap.style.display = 'flex';
+            // Fix #13: inject the "Detect names" button once into the wrap if not already there.
+            ensureDetectNamesButton(wrap);
             // One-tap convenience: prefill the box with the top suggestion if it's still empty.
             const input = document.getElementById('partyUsernameInput');
             if (input && !input.value.trim() && !partyState.username) input.value = partySuggestedNames[0];
         }
+        // Fix #13: inject the "Detect names" button into the suggestion wrap once.
+        function ensureDetectNamesButton(wrap) {
+            if (!wrap || wrap.querySelector('.party-detect-names-btn')) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'party-detect-names-btn';
+            btn.textContent = '↺ Detect';
+            btn.title = 'Re-scan combat log for name suggestions';
+            btn.style.cssText = 'margin:2px 0 2px 8px;padding:3px 9px;font-size:11px;border-radius:11px;border:1px solid rgba(100,116,139,0.5);background:rgba(100,116,139,0.15);color:#94a3b8;cursor:pointer;';
+            btn.addEventListener('click', requestDetectNames);
+            wrap.appendChild(btn);
+        }
+
+        // Fix #13: request a fresh name detection from the backend.
+        function requestDetectNames() {
+            try { sendCommand('get_suggested_names'); } catch (e) {}
+            // Surface the wrap while we wait (may be hidden if no prior names)
+            const wrap = document.getElementById('partyNameSuggestions');
+            if (wrap) wrap.style.display = 'flex';
+        }
+
         function pickPartyName(name) {
             const input = document.getElementById('partyUsernameInput');
             if (input) input.value = name;
@@ -1095,7 +1143,11 @@
                 // Update party code display
                 document.getElementById('partyCodeDisplay').textContent = partyState.party_code;
                 
-                // Show/hide leader controls vs waiting message
+                // Fix #5 — Remove the obsolete manual Start/End controls box.
+                // Recording is automatic (armPartyRecording on join). We keep only the
+                // RECORDING indicator (partyEncounterLive) and hide everything else in
+                // the encounter section. The waitingMsg is also retired since auto-record
+                // means every member is always armed.
                 const encounterControls = document.getElementById('partyEncounterControls');
                 const waitingMsg = document.getElementById('partyWaitingMsg');
                 const startBtn = document.getElementById('partyStartBtn');
@@ -1103,27 +1155,16 @@
                 const encounterLive = document.getElementById('partyEncounterLive');
                 const countdownDiv = document.getElementById('partyCountdown');
                 const syncBtn = document.getElementById('partySyncBtn');
-                
-                if (partyState.is_leader) {
-                    encounterControls.style.display = 'block';
-                    waitingMsg.style.display = 'none';
-                    if (syncBtn) syncBtn.style.display = 'inline-block';
-                    
-                    // Auto-record (keystone, 2026-05-31): recording arms automatically on join and
-                    // each fight records itself — no manual Start/End. Hide the legacy buttons.
-                    if (!countdownTimer) {
-                        startBtn.style.display = 'none';
-                        endBtn.style.display = 'none';
-                        countdownDiv.style.display = 'none';
-                    }
-                } else {
-                    encounterControls.style.display = 'none';
-                    waitingMsg.style.display = partyState.encounter_active ? 'none' : 'block';
-                    if (syncBtn) syncBtn.style.display = 'none';
-                }
-                
-                // Show recording indicator during encounter
-                encounterLive.style.display = partyState.encounter_active ? 'flex' : 'none';
+                // Always hide the manual Start/End controls; only the live indicator remains.
+                if (encounterControls) encounterControls.style.display = 'none';
+                if (startBtn) startBtn.style.display = 'none';
+                if (endBtn) endBtn.style.display = 'none';
+                if (countdownDiv && !countdownTimer) countdownDiv.style.display = 'none';
+                if (waitingMsg) waitingMsg.style.display = 'none';
+                // Sync button: visible for leader only.
+                if (syncBtn) syncBtn.style.display = partyState.is_leader ? 'inline-block' : 'none';
+                // Recording indicator always visible while armed.
+                if (encounterLive) encounterLive.style.display = partyState.encounter_active ? 'flex' : 'none';
                 
                 // Leave button (Phase 1: leader leaving doesn't disband the room for others).
                 const leaveBtn = document.getElementById('partyLeaveBtn');
@@ -1166,14 +1207,62 @@
                 if (isLeader) badges += '<span class="party-member-badge leader">👑</span>';
                 if (isSelf) badges += '<span class="party-member-badge you">YOU</span>';
 
+                // Fix #7: Kick button — leader-only, not shown for self or other leaders.
+                const canKick = partyState.is_leader && !isSelf && !isLeader;
+                const kickBtn = canKick
+                    ? `<button class="party-kick-btn" onclick="kickPartyMember('${escapeHtml(m.user_id)}','${escapeHtml(m.username)}')" `
+                      + `title="Kick ${escapeHtml(m.username)}" `
+                      + `style="margin-left:auto;padding:1px 7px;font-size:0.7rem;background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.5);color:#fca5a5;border-radius:4px;cursor:pointer;">✕ Kick</button>`
+                    : '';
+
                 return `
                     <div class="party-member-item ${isLeader ? 'leader' : ''} ${isSelf ? 'self' : ''} ${!isOnline ? 'offline' : ''}">
                         <span class="party-member-status ${isOnline ? 'online' : 'offline'}"></span>
                         <span class="party-member-name">${safeName}</span>
-                        ${badges}
+                        ${badges}${kickBtn}
                     </div>
                 `;
             }).join('');
+
+            // Fix #7: Reset Roster button — appended below the list, leader-only.
+            if (partyState.is_leader) {
+                container.innerHTML += `<div style="margin-top:8px;text-align:right;">
+                    <button onclick="resetPartyRoster()" title="Remove all offline / old members" `
+                    + `style="padding:3px 10px;font-size:0.72rem;background:rgba(100,116,139,0.2);border:1px solid rgba(100,116,139,0.4);color:#94a3b8;border-radius:4px;cursor:pointer;">🔄 Reset Roster</button>
+                </div>`;
+            }
+        }
+
+        // Fix #7: Kick a member (leader only) — sends the worker kick command.
+        function kickPartyMember(userId, username) {
+            if (!partyState.is_leader) return;
+            if (!confirm(`Kick ${username} from the party?`)) return;
+            if (!partyWS || partyWS.readyState !== WebSocket.OPEN) {
+                console.warn('[Party] kick: WS not open');
+                return;
+            }
+            try {
+                partyWS.send(JSON.stringify({ type: 'kick', target_uid: userId }));
+                partyDebug('party.kick', { target_uid: userId, username: username });
+            } catch (err) {
+                console.error('[Party] Error sending kick:', err);
+            }
+        }
+
+        // Fix #8: Reset roster (leader only) — clears stale/offline members server-side.
+        function resetPartyRoster() {
+            if (!partyState.is_leader) return;
+            if (!confirm('Reset the party roster? This removes stale and offline members.')) return;
+            if (!partyWS || partyWS.readyState !== WebSocket.OPEN) {
+                console.warn('[Party] reset_roster: WS not open');
+                return;
+            }
+            try {
+                partyWS.send(JSON.stringify({ type: 'reset_roster' }));
+                partyDebug('party.reset_roster', {});
+            } catch (err) {
+                console.error('[Party] Error sending reset_roster:', err);
+            }
         }
         
         // Render party results
