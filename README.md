@@ -1,9 +1,14 @@
 # ツCKヤ DPS Meter
 
-A combat-log analyzer for **Throne and Liberty** — real-time DPS, crit/heavy
-tracking, per-skill rotation analysis, and side-by-side build comparison, in a
-single native window. It reads the log files the game writes; it never touches the
-game process.
+A combat-log analyzer for **Throne and Liberty** with two halves:
+
+- **👥 Party DPS** — a live, shared **boss scoreboard** that shows how your whole
+  group stacks up on every kill (everyone runs the app), with per-member
+  drill-down and head-to-head compare.
+- **🧪 Solo Lab** — a deep **build-testing** toolkit for tuning your own rotation:
+  per-skill breakdowns, rotation timelines, and side-by-side build comparison.
+
+It reads the log files the game writes; it never touches the game process.
 
 > Backend rebuilt from scratch as owned, open code. Original concept by
 > **SirPHz** ([mjb6967/CKdpsApp](https://github.com/mjb6967/CKdpsApp)) — see
@@ -39,7 +44,37 @@ you leave combat, so stats populate when a fight ends, not during.
 
 ---
 
-## Features
+## 👥 Party DPS
+
+Turn everyone's combat logs into **one shared boss scoreboard** — no more comparing
+screenshots after a run. Each person runs the app and joins the same party; every
+boss kill produces a single ranked board with everyone on it.
+
+- **One merged board per boss.** Each kill = a ranked scoreboard with every
+  member's damage, **contribution %**, DPS, hits, and crit / heavy rates.
+- **Drill into any teammate.** Click a member to see their full **per-skill
+  breakdown** and **rotation timeline** — the same depth as your own solo view.
+- **Head-to-head compare.** Pick any two members and compare their skills side-by-side.
+- **Every boss, in order.** A multi-boss run keeps each kill as its own board —
+  flip between them with the encounter switcher.
+- **In-game overlay.** A transparent, click-through overlay floats the live board
+  over the game while you fight.
+- **Dead-simple join.** Share a 4-character code or a one-click invite link —
+  joiners enter the code (or click the link) and they're in.
+- **Post-combat by design.** T&L writes logs when a fight ends, so the board fills
+  in the moment the boss dies — reliable, no fragile live HUD.
+
+Runs on its own (owned) infrastructure; nothing about your account is shared
+beyond the party scoreboard itself.
+
+> Party DPS is in active development — rough edges and missing polish are expected.
+> Feedback and bug reports are very welcome.
+
+---
+
+## 🧪 Solo Lab
+
+The full solo toolkit, for when you're tuning your own build:
 
 ### 📊 Build Testing
 60-second standardized tests for fair build comparison — real-time DPS, crit, heavy,
@@ -65,9 +100,6 @@ hit type, interval chart).
 Save encounters with build tags + class, load any for full review, combine encounters
 into full dungeon runs with boss detection and run summaries.
 
-### 👥 Party DPS (Beta)
-Post-pull damage leaderboard shared across a party (all members run the app).
-
 ---
 
 ## Enable Combat Logging
@@ -80,11 +112,12 @@ Logs save to `%LOCALAPPDATA%\TL\Saved\CombatLogs`.
 
 ---
 
-## Global Hotkey
+## Hotkeys
 
 | Hotkey | Action |
 |--------|--------|
 | `Ctrl+Tab` | Reset encounter (works while in-game) |
+| `Ctrl+Shift+O` | Toggle overlay click-through (let clicks pass to the game) |
 
 ---
 
@@ -126,8 +159,12 @@ Reveal the folder from the app's sidebar ("🗃️ App Data"); reset fight data 
 
 ## FAQ
 
+**Do all of us need the app for Party DPS?** Yes — the party board is built from each
+member's own combat log, so everyone who wants to appear on it runs the app and joins
+the same party. Make sure Combat Logging is enabled in-game, or you won't show up.
+
 **Why don't I see damage during combat?** T&L writes logs when you leave combat, not
-during. Stats appear after each fight.
+during. Stats (solo and party) appear after each fight ends.
 
 **Can I get banned?** The tool only reads log files the game generates. It does not
 inject into, modify, or interact with the game process.
