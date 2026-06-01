@@ -1,11 +1,11 @@
-        function saveEncounterEdit() {
+        async function saveEncounterEdit() {
             const id = document.getElementById('editEncounterId').value;
             const classValue = document.getElementById('editClassSelect').value;
             const buildTag = document.getElementById('editBuildTagInput').value.trim();
             const notes = document.getElementById('editEncounterNotes').value.trim();
-            
+
             if (!buildTag) {
-                alert('Please enter a build tag');
+                await partyAlert('Please enter a build tag');
                 return;
             }
             
@@ -191,13 +191,13 @@
             sendCommand('open_data_folder');
         }
 
-        function resetData() {
+        async function resetData() {
             const message = `♻️ Reset App Data\n\n` +
                 `This permanently clears ALL saved encounters and saved runs.\n\n` +
                 `Your settings (skill/weapon/target config) and presets are kept.\n` +
                 `Your combat log files are NOT touched.\n\n` +
                 `This cannot be undone. Continue?`;
-            if (confirm(message)) {
+            if (await partyConfirm(message)) {
                 sendCommand('reset_data');
             }
         }
@@ -643,7 +643,7 @@
                     sendCommand('get_encounters');
                     sendCommand('get_saved_runs');
                     sendCommand('get_encounter_history');
-                    alert('✅ App data reset — saved encounters and runs cleared.');
+                    partyAlert('✅ App data reset — saved encounters and runs cleared.');
                 }
                 else if (msg.type === 'encounter_saved') {
                     savedEncounters.unshift(msg.encounter);
@@ -716,7 +716,7 @@
                     updateDashboard();
                 }
                 else if (msg.type === 'log_purged') {
-                    alert('✔ Log file purged successfully!\n\nFile: ' + (msg.file || 'Unknown'));
+                    partyAlert('✔ Log file purged successfully!\n\nFile: ' + (msg.file || 'Unknown'));
                     clearFullSessionLog();  // Clear the persistent log display
                 }
                 else if (msg.type === 'skill_settings') {
@@ -766,7 +766,7 @@
                     }
                 }
                 else if (msg.type === 'run_saved') {
-                    alert(msg.message || 'Run saved successfully!');
+                    partyAlert(msg.message || 'Run saved successfully!');
                     console.log('[RunBuilder] Run saved:', msg.run_id);
                     // Refresh saved runs list if visible
                     if (savedRunsVisible) {
@@ -894,7 +894,7 @@
                     console.log('[Reset] Remote reset triggered via hotkey - build test initialized');
                 }
                 else if (msg.type === 'error') {
-                    alert(msg.message);
+                    partyAlert(msg.message);
                 }
             };
             ws.onclose = () => {
@@ -933,7 +933,7 @@
             sendCommand('reset');
         }
         
-        function purgeLogFile() {
+        async function purgeLogFile() {
             const logPath = document.getElementById('logPath').value || 'Unknown location';
             const message = `⚠️ WARNING: This will permanently delete ALL combat log data!\n\n` +
                 `Log folder: ${logPath}\n\n` +
@@ -941,10 +941,10 @@
                 `  Open Ring Menu and deactivate Combat Log\n\n` +
                 `This action CANNOT be undone.\n\n` +
                 `Are you sure you want to purge the log file?`;
-            
-            if (confirm(message)) {
+
+            if (await partyConfirm(message)) {
                 // Double confirmation for destructive action
-                if (confirm('⚠️ FINAL WARNING: Click OK to permanently delete all log data.\n\n(Make sure combat logging is disabled in-game!)')) {
+                if (await partyConfirm('⚠️ FINAL WARNING: Click OK to permanently delete all log data.\n\n(Make sure combat logging is disabled in-game!)')) {
                     sendCommand('purge_log');
                 }
             }
