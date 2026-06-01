@@ -5,6 +5,35 @@ All notable changes are documented here. Format loosely based on
 
 ---
 
+## [1.0.2] - 2026-06-01
+
+The **Party DPS** release — the party feature is now a real, shared boss scoreboard.
+
+### Added
+- **Party DPS — live shared boss scoreboard.** Everyone in the party runs the app and
+  joins the same code; each boss kill produces one merged, ranked board with every
+  member's damage, contribution %, DPS, hits, and crit / heavy rates.
+- **Drill into any teammate** — their full per-skill breakdown and rotation timeline,
+  the same depth as your own solo view.
+- **Head-to-head compare** — pick any two members and compare their skills side-by-side.
+- **Multi-boss runs** — each kill is kept as its own board; flip between them with the
+  encounter switcher.
+- **In-game overlay** — a transparent, click-through board you can float over the game
+  (`Ctrl+Shift+O` toggles click-through).
+- **Easy join** — a 4-character party code or a one-click invite link.
+
+### Fixed
+- **Party breakdowns no longer get stuck on "Loading…".** Opening a teammate's breakdown
+  before their fight finished could leave it spinning forever, even after their data
+  arrived. Breakdowns now load reliably, update automatically the moment a teammate's
+  fight ends, and show "still in combat" instead of a dead spinner.
+- **No more duplicate / ghost members** after closing and reopening the app — your
+  identity now persists across launches.
+- **Reliable merged board** — two players who pulled the same boss a few seconds apart
+  now land on one board instead of splitting into separate ones.
+
+---
+
 ## [1.0.1] - 2026-05-30
 
 ### Fixed
