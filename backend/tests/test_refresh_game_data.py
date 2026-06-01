@@ -642,3 +642,49 @@ def test_rewrite_sentinel_full_roundtrip_fixture():
     assert '"morokai": "field_boss",' in new_source
     assert '"tevent": "archboss",' in new_source
     assert "goblin fighter" not in new_source
+
+
+# --- G4: _is_junk_boss_name — filter predicate unit tests ---------------------------------
+def test_is_junk_uiname_suffix():
+    """Names ending in _uiname (any case) are junk DB keys."""
+    assert rgd._is_junk_boss_name("m_elder_melchior_uiname")
+    assert rgd._is_junk_boss_name("m_gorilla_thuban_uiname")
+    assert rgd._is_junk_boss_name("m_python_gigant_uiname")
+    assert rgd._is_junk_boss_name("m_tigerbeetle_vulcanus_uiname")
+    assert rgd._is_junk_boss_name("m_harshcrow_kimon903_uiname")
+    # Case-insensitive: capital UIName suffix also flagged
+    assert rgd._is_junk_boss_name("m_something_UIName")
+    assert rgd._is_junk_boss_name("m_something_UINAME")
+
+
+def test_is_junk_m_underscore_key():
+    """Names matching ^m_[a-z0-9_]+$ (all-lowercase, underscore-joined, no spaces) are junk."""
+    assert rgd._is_junk_boss_name("m_gorilla_thuban")
+    assert rgd._is_junk_boss_name("m_python_gigant")
+    assert rgd._is_junk_boss_name("m_harshcrow_kimon903")
+
+
+def test_is_junk_does_not_drop_real_names():
+    """Real boss display names must NOT be filtered."""
+    # Single-word names (no spaces, but do not match ^m_[a-z0-9_]+$ pattern)
+    assert not rgd._is_junk_boss_name("velentra")
+    assert not rgd._is_junk_boss_name("nerzatum")
+    assert not rgd._is_junk_boss_name("tevent")
+    assert not rgd._is_junk_boss_name("morokai")
+    assert not rgd._is_junk_boss_name("adentus")
+    # Multi-word names
+    assert not rgd._is_junk_boss_name("queen bellandir")
+    assert not rgd._is_junk_boss_name("ascended tevent")
+    assert not rgd._is_junk_boss_name("Grand Aelon")
+    assert not rgd._is_junk_boss_name("Frost Walker Aridus")
+
+
+def test_is_junk_edge_cases():
+    """Edge: empty string is not junk (falsy short-circuit); near-misses are not junk."""
+    assert not rgd._is_junk_boss_name("")
+    # Has uppercase -> does NOT match ^m_[a-z0-9_]+$ (regex is case-sensitive for that branch)
+    assert not rgd._is_junk_boss_name("M_Gorilla_Thuban")
+    # Has spaces -> not an underscore-only key
+    assert not rgd._is_junk_boss_name("m gorilla thuban")
+    # Does not start with m_
+    assert not rgd._is_junk_boss_name("x_something_else")

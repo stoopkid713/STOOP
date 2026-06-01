@@ -577,6 +577,25 @@ def _norm_boss_name(name) -> str:
     return str(name or "").strip().lower()
 
 
+_JUNK_UINAME_RE = re.compile(r"_uiname$", re.IGNORECASE)
+_JUNK_KEY_RE = re.compile(r"^m_[a-z0-9_]+$")
+
+
+def _is_junk_boss_name(name: str) -> bool:
+    """Return True if `name` is an un-localized DB key that should be filtered out.
+
+    Two patterns indicate a questlog localization key leaked into the feed instead of a
+    display name:
+      1. Ends with ``_uiname`` (case-insensitive) — e.g. ``m_gorilla_thuban_uiname``
+      2. Matches ``^m_[a-z0-9_]+$`` — all-lowercase, underscore-joined, no spaces,
+         starts with ``m_`` — e.g. ``m_python_gigant_uiname``, ``m_elder_melchior_uiname``
+
+    Real boss names always contain spaces or are normal words (e.g. "velentra",
+    "queen bellandir", "nerzatum") — they will NOT match either predicate.
+    """
+    return bool(_JUNK_UINAME_RE.search(name) or _JUNK_KEY_RE.match(name))
+
+
 def derive_known_bosses_map(target_assignments: dict) -> dict:
     """Derive the {normalized_name: category} map for KNOWN_BOSSES in index.js.
 
@@ -587,6 +606,10 @@ def derive_known_bosses_map(target_assignments: dict) -> dict:
     (for "boss" category) or "archboss" (for "boss-world" category).
 
     Normalization matches the worker's `norm()` fn: trim + lowercase.
+
+    Un-localized DB keys (names ending in ``_uiname`` or matching ``^m_[a-z0-9_]+$``)
+    are filtered out before insertion — they are questlog data artifacts, not real boss
+    names, and would never match a combat-log target.
 
     Returns a plain dict {normalized_name: category_string} sorted by key.
     """
@@ -603,6 +626,7 @@ def derive_known_bosses_map(target_assignments: dict) -> dict:
                 curated[key] = category  # e.g. "field_boss", "raid_boss", "dungeon_boss"
 
     out: dict = {}
+    junk_count = 0
 
     for ql_cat in _QUESTLOG_BOSS_CATS:
         print(f"  Pulling questlog NPC feed for mainCategory='{ql_cat}'...")
@@ -616,6 +640,11 @@ def derive_known_bosses_map(target_assignments: dict) -> dict:
             name = str(row.get("name") or "").strip()
             if not name:
                 continue
+            # Filter out un-localized DB keys (questlog data artifact, not a real display name)
+            if _is_junk_boss_name(name):
+                junk_count += 1
+                print(f"  [filter] Dropping junk key: {name!r}")
+                continue
             key = _norm_boss_name(name)
             if not key:
                 continue
@@ -626,6 +655,9 @@ def derive_known_bosses_map(target_assignments: dict) -> dict:
                 label = curated.get(key, "boss")
             # Last-write wins on collision across categories (boss-world wins over boss)
             out[key] = label
+
+    if junk_count:
+        print(f"  Filtered {junk_count} junk key(s) total (un-localized DB keys)")
 
     return dict(sorted(out.items()))
 
