@@ -6489,6 +6489,17 @@
         table.pr-cmp-table td.purple, table.pr-skill-table td.purple { color: #a78bfa; }
         table.pr-cmp-table td.yellow, table.pr-skill-table td.yellow { color: #fbbf24; }
         table.pr-cmp-table td.orange, table.pr-skill-table td.orange { color: #fb923c; }
+        table.pr-cmp-table td.teal, table.pr-skill-table td.teal { color: #2dd4bf; }
+        /* Trophies tab (party superlatives) */
+        .pr-trophies { padding: 4px 2px; }
+        .pr-trophy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+        .pr-trophy-card { background: rgba(34, 211, 238, 0.05); border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 10px; padding: 12px 14px; }
+        .pr-trophy-icon { font-size: 20px; }
+        .pr-trophy-title { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; margin: 4px 0; }
+        .pr-trophy-winner { color: #e2e8f0; font-size: 16px; font-weight: 600; }
+        .pr-trophy-detail { color: #22d3ee; font-size: 13px; margin-top: 2px; }
+        .pr-trophy-na { color: #475569; }
+        .pr-trophy-loading, .pr-trophy-pending { color: #94a3b8; font-size: 13px; padding: 8px 2px; }
 
         .party-result-row.rank-1 {
             background: rgba(251, 191, 36, 0.05);
@@ -10960,6 +10971,7 @@
                                         <button class="party-tab" data-ptab="rotation" onclick="switchPartyTab('rotation')">Rotation</button>
                                         <button class="party-tab" data-ptab="compare" onclick="switchPartyTab('compare')">Compare</button>
                                         <button class="party-tab" data-ptab="history" onclick="switchPartyTab('history')">History</button>
+                                        <button class="party-tab" data-ptab="trophies" onclick="switchPartyTab('trophies')">Trophies</button>
                                     </div>
 
                                     <!-- Results Container -->
@@ -22036,14 +22048,14 @@ ${attemptLine}
 
         /* @end:class-insights */
         /* @inject:encounter-edit — GENERATED from /src/js/encounter-edit.js by build.py; edit the SOURCE, not here */
-        function saveEncounterEdit() {
+        async function saveEncounterEdit() {
             const id = document.getElementById('editEncounterId').value;
             const classValue = document.getElementById('editClassSelect').value;
             const buildTag = document.getElementById('editBuildTagInput').value.trim();
             const notes = document.getElementById('editEncounterNotes').value.trim();
-            
+
             if (!buildTag) {
-                alert('Please enter a build tag');
+                await partyAlert('Please enter a build tag');
                 return;
             }
             
@@ -22229,13 +22241,13 @@ ${attemptLine}
             sendCommand('open_data_folder');
         }
 
-        function resetData() {
+        async function resetData() {
             const message = `♻️ Reset App Data\n\n` +
                 `This permanently clears ALL saved encounters and saved runs.\n\n` +
                 `Your settings (skill/weapon/target config) and presets are kept.\n` +
                 `Your combat log files are NOT touched.\n\n` +
                 `This cannot be undone. Continue?`;
-            if (confirm(message)) {
+            if (await partyConfirm(message)) {
                 sendCommand('reset_data');
             }
         }
@@ -22681,7 +22693,7 @@ ${attemptLine}
                     sendCommand('get_encounters');
                     sendCommand('get_saved_runs');
                     sendCommand('get_encounter_history');
-                    alert('✅ App data reset — saved encounters and runs cleared.');
+                    partyAlert('✅ App data reset — saved encounters and runs cleared.');
                 }
                 else if (msg.type === 'encounter_saved') {
                     savedEncounters.unshift(msg.encounter);
@@ -22754,7 +22766,7 @@ ${attemptLine}
                     updateDashboard();
                 }
                 else if (msg.type === 'log_purged') {
-                    alert('✔ Log file purged successfully!\n\nFile: ' + (msg.file || 'Unknown'));
+                    partyAlert('✔ Log file purged successfully!\n\nFile: ' + (msg.file || 'Unknown'));
                     clearFullSessionLog();  // Clear the persistent log display
                 }
                 else if (msg.type === 'skill_settings') {
@@ -22804,7 +22816,7 @@ ${attemptLine}
                     }
                 }
                 else if (msg.type === 'run_saved') {
-                    alert(msg.message || 'Run saved successfully!');
+                    partyAlert(msg.message || 'Run saved successfully!');
                     console.log('[RunBuilder] Run saved:', msg.run_id);
                     // Refresh saved runs list if visible
                     if (savedRunsVisible) {
@@ -22932,7 +22944,7 @@ ${attemptLine}
                     console.log('[Reset] Remote reset triggered via hotkey - build test initialized');
                 }
                 else if (msg.type === 'error') {
-                    alert(msg.message);
+                    partyAlert(msg.message);
                 }
             };
             ws.onclose = () => {
@@ -22971,7 +22983,7 @@ ${attemptLine}
             sendCommand('reset');
         }
         
-        function purgeLogFile() {
+        async function purgeLogFile() {
             const logPath = document.getElementById('logPath').value || 'Unknown location';
             const message = `⚠️ WARNING: This will permanently delete ALL combat log data!\n\n` +
                 `Log folder: ${logPath}\n\n` +
@@ -22979,10 +22991,10 @@ ${attemptLine}
                 `  Open Ring Menu and deactivate Combat Log\n\n` +
                 `This action CANNOT be undone.\n\n` +
                 `Are you sure you want to purge the log file?`;
-            
-            if (confirm(message)) {
+
+            if (await partyConfirm(message)) {
                 // Double confirmation for destructive action
-                if (confirm('⚠️ FINAL WARNING: Click OK to permanently delete all log data.\n\n(Make sure combat logging is disabled in-game!)')) {
+                if (await partyConfirm('⚠️ FINAL WARNING: Click OK to permanently delete all log data.\n\n(Make sure combat logging is disabled in-game!)')) {
                     sendCommand('purge_log');
                 }
             }
@@ -23937,6 +23949,10 @@ ${attemptLine}
         }
         
         function refreshDiagnostics() {
+            // Always refresh the log-status banner on every diagnostics tick (every
+            // stats broadcast, ~0.5 s) so the own-client warning stays live.
+            renderLogStatusBanner();
+
             // 1. Server running (WebSocket connected)
             const serverOk = ws && ws.readyState === WebSocket.OPEN;
             updateDiagItem('diagServer', serverOk ? 'ok' : 'error', 'Server running');
@@ -24002,6 +24018,79 @@ ${attemptLine}
             if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
             return `${Math.floor(seconds / 3600)}h ago`;
         }
+
+        // === HALF A — OWN-CLIENT LOGGING STATUS BANNER (#14) ===
+        // Renders an unmissable banner inside the party active view so the local user
+        // knows immediately if their combat log is missing or silent.
+        //
+        // Three states:
+        //   "off"     — no combat-log file detected at all (lastLogFile is null).
+        //               Big amber warning; includes a one-line how-to-enable hint.
+        //   "waiting" — log file present but no combat activity seen yet (lastLogActivity
+        //               is null OR more than COMBAT_STALE_MS ms ago).  Calm blue/grey pill.
+        //   "ok"      — log file present AND combat seen recently.  No banner (silent ok).
+        //
+        // The banner is refreshed:
+        //   • each time updatePartyUI() runs (covers join/leave/reconnect)
+        //   • each time refreshDiagnostics() runs (covers every stats broadcast tick)
+        //   • from party_live_hit handler (called in encounter-edit.js — no extra hook needed;
+        //     diagnosticsOpen check is skipped so the banner always stays current)
+        //
+        // The banner only appears while the party active view is visible (connected to a room).
+        const COMBAT_STALE_MS = 60_000; // 60 s of silence = "waiting for combat"
+
+        function _logBannerState() {
+            const logFound = !!lastLogFile;
+            if (!logFound) return 'off';
+            const recentCombat = lastLogActivity && (Date.now() - lastLogActivity) < COMBAT_STALE_MS;
+            return recentCombat ? 'ok' : 'waiting';
+        }
+
+        function renderLogStatusBanner() {
+            // Only show while in an active party session (connected view visible).
+            if (!partyState.connected || !partyState.party_code) return;
+
+            // Find or create the banner element inside the active view.
+            let banner = document.getElementById('partyLogStatusBanner');
+            if (!banner) {
+                const activeView = document.getElementById('partyActiveView');
+                if (!activeView) return;
+                banner = document.createElement('div');
+                banner.id = 'partyLogStatusBanner';
+                // Insert at the very top of the active view so it can't be missed.
+                activeView.insertBefore(banner, activeView.firstChild);
+            }
+
+            const state = _logBannerState();
+
+            if (state === 'off') {
+                // Big unmissable amber warning.
+                banner.style.cssText = [
+                    'display:flex', 'align-items:center', 'gap:10px',
+                    'margin:0 0 10px 0', 'padding:10px 14px',
+                    'background:rgba(251,191,36,0.18)', 'border:1.5px solid rgba(251,191,36,0.6)',
+                    'border-radius:8px', 'color:#fbbf24', 'font-size:0.88rem', 'line-height:1.4',
+                ].join(';');
+                banner.innerHTML = '<span style="font-size:1.3rem;flex-shrink:0;">⚠️</span>'
+                    + '<span><strong>Combat logging is OFF — you will not appear on the board.</strong>'
+                    + '<br><span style="color:#fde68a;font-size:0.82rem;">Enable it in T&L: Settings → Gameplay → Combat Log → turn ON, then re-launch the game.</span></span>';
+            } else if (state === 'waiting') {
+                // Calm informational pill — log is on, just no combat yet.
+                banner.style.cssText = [
+                    'display:flex', 'align-items:center', 'gap:8px',
+                    'margin:0 0 10px 0', 'padding:7px 12px',
+                    'background:rgba(100,116,139,0.15)', 'border:1px solid rgba(100,116,139,0.35)',
+                    'border-radius:8px', 'color:#94a3b8', 'font-size:0.83rem',
+                ].join(';');
+                banner.innerHTML = '<span style="font-size:1.1rem;">🟢</span>'
+                    + '<span>Logging on — waiting for combat…</span>';
+            } else {
+                // ok — hide the banner entirely.
+                banner.style.display = 'none';
+                return;
+            }
+        }
+        // === END HALF A BANNER ===
         
         // Start encounter (leader only) — the room relays encounter_start to everyone
         // (including us), which arms each member's local recording via handleEncounterStart.
@@ -24532,13 +24621,17 @@ ${attemptLine}
                 if (leaveBtn) {
                     leaveBtn.innerHTML = '🚪 Leave Party';
                 }
-                
+
+                // Half A (#14): always refresh the own-client log-status banner when the
+                // active view is shown (join, reconnect, every updatePartyUI call).
+                renderLogStatusBanner();
+
             } else {
                 // Show setup view
                 setupView.style.display = 'grid';
                 activeView.style.display = 'none';
             }
-            
+
             // Refresh diagnostics if open
             if (diagnosticsOpen) refreshDiagnostics();
         }
@@ -24548,7 +24641,8 @@ ${attemptLine}
             const container = document.getElementById('partyMembersList');
             const countEl = document.getElementById('partyMemberCount');
 
-            // Roster comes straight from the room: [{user_id, username, is_leader, online}].
+            // Roster from the room: [{user_id, username, is_leader, online, has_posted, joined_age_s}].
+            // has_posted / joined_age_s are added by Half B (#14); older workers omit them safely.
             const roster = partyState.roster || [];
             const onlineCount = roster.filter(m => m.online).length;
             countEl.textContent = `${onlineCount}/${roster.length}`;
@@ -24557,6 +24651,17 @@ ${attemptLine}
                 container.innerHTML = '<div class="party-member-item loading">Waiting for members...</div>';
                 return;
             }
+
+            // HALF B (#14) — grace period for brand-new members before showing "⚠ not logging".
+            // T&L flushes the combat log in batches (not per-hit), so the FIRST post_fight arrives
+            // only after the first combat segment ends + idle timeout fires (~45–60 s). A member
+            // who just joined needs at least that long before we can fairly flag them as dark.
+            // We use a TWO-TIER threshold:
+            //   joined_age_s < GRACE_S  → show "joining…" (neutral, no alarm)
+            //   joined_age_s >= GRACE_S AND !has_posted → show "⚠ not logging" (alarm)
+            //   has_posted              → no transmit indicator (normal)
+            // The worker sends `joined_age_s`; if absent (old worker), treat as 0 (grace).
+            const TRANSMIT_GRACE_S = 90; // 90 s before flagging as "not logging"
 
             container.innerHTML = roster.map(m => {
                 const isLeader = !!m.is_leader;
@@ -24567,6 +24672,28 @@ ${attemptLine}
                 let badges = '';
                 if (isLeader) badges += '<span class="party-member-badge leader">👑</span>';
                 if (isSelf) badges += '<span class="party-member-badge you">YOU</span>';
+
+                // Half B (#14): per-member transmit indicator on the ROSTER row.
+                // Only shown for online members (offline members can't be transmitting).
+                // Self is excluded — your own log status is the Half A banner above.
+                let transmitBadge = '';
+                if (isOnline && !isSelf && m.has_posted === false) {
+                    // has_posted is explicitly false (not just absent — old worker = undefined).
+                    const ageS = typeof m.joined_age_s === 'number' ? m.joined_age_s : 0;
+                    if (ageS >= TRANSMIT_GRACE_S) {
+                        // Been in the room long enough — definitely not posting.
+                        transmitBadge = '<span title="This player has not sent any combat data — their logging may be OFF" '
+                            + 'style="margin-left:4px;padding:1px 6px;font-size:0.68rem;'
+                            + 'background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.55);'
+                            + 'color:#fbbf24;border-radius:4px;white-space:nowrap;">⚠ not logging</span>';
+                    } else {
+                        // Still within grace — just joined, waiting for first combat flush.
+                        transmitBadge = '<span title="Waiting for first combat data from this player" '
+                            + 'style="margin-left:4px;padding:1px 6px;font-size:0.68rem;'
+                            + 'background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.4);'
+                            + 'color:#94a3b8;border-radius:4px;white-space:nowrap;">joining…</span>';
+                    }
+                }
 
                 // Fix #7: Kick button — leader-only, not shown for self or other leaders.
                 const canKick = partyState.is_leader && !isSelf && !isLeader;
@@ -24580,7 +24707,7 @@ ${attemptLine}
                     <div class="party-member-item ${isLeader ? 'leader' : ''} ${isSelf ? 'self' : ''} ${!isOnline ? 'offline' : ''}">
                         <span class="party-member-status ${isOnline ? 'online' : 'offline'}"></span>
                         <span class="party-member-name">${safeName}</span>
-                        ${badges}${kickBtn}
+                        ${badges}${transmitBadge}${kickBtn}
                     </div>
                 `;
             }).join('');
@@ -24980,6 +25107,246 @@ const PartyRender = {
       + '<div class="pr-rot-axis"><span>0s</span><span>15s</span><span>30s</span><span>45s</span><span>60s</span></div>'
       + '</div>';
   },
+
+  // ===== Trophies tab — post-fight superlatives =====
+  //
+  // computeTrophies(entries, memberDetails, encounterId)
+  //   entries       — array of scoreboard entry objects from the board
+  //                   ({user_id, username, total_damage, dps, hits, crit_rate,
+  //                     heavy_rate, crit_heavy_rate, crit_heavy_count, has_detail})
+  //   memberDetails — the partyState.memberDetails map (keys: "encId:userId")
+  //                   each value has a ``rotation`` array of per-hit objects:
+  //                   {relative_time, skill, damage, is_crit, is_heavy}
+  //   encounterId   — the encounter_id string used to build the lookup key
+  //
+  // Returns a trophies object with these awards (all nullable when data absent):
+  //   {
+  //     highestSustainedDps:  { username, dps (number), windowSec }  | null
+  //     hardestHit:           { username, skill, damage }            | null
+  //     mostDamage:           { username, damage }                   | null  (redundant with rank-1 but explicit)
+  //     mostCritHeavy:        { username, count, rate }              | null
+  //     biggestCritHit:       { username, skill, damage }            | null
+  //     missingDetail:        boolean  — true if ≥1 member lacks fetched rotation
+  //     totalMembers:         number
+  //     membersWithDetail:    number
+  //   }
+  //
+  // "Highest sustained DPS" uses a rolling WINDOW_SEC-second window over per-hit data.
+  // Members without fetched detail are skipped for hit-level trophies; ``missingDetail``
+  // flags the partial-data state so the renderer can show a loading nudge.
+  computeTrophies(entries, memberDetails, encounterId) {
+    const WINDOW_SEC = 10; // rolling window for sustained-DPS trophy
+    entries = entries || [];
+    memberDetails = memberDetails || {};
+
+    let highestSustainedDps = null;
+    let hardestHit = null;
+    let mostDamage = null;
+    let mostCritHeavy = null;
+    let biggestCritHit = null;
+    let missingDetail = false;
+    let membersWithDetail = 0;
+
+    // --- Most damage (from scoreboard totals — always available) ---
+    entries.forEach((e) => {
+      const dmg = Number(e && e.total_damage) || 0;
+      if (!mostDamage || dmg > mostDamage.damage) {
+        mostDamage = { username: (e && e.username) || '?', damage: dmg };
+      }
+    });
+
+    // --- Most crit+heavy hits (from scoreboard stats — always available) ---
+    entries.forEach((e) => {
+      const count = Number(e && e.crit_heavy_count) || 0;
+      const rate  = Number(e && e.crit_heavy_rate) || 0;
+      if (!mostCritHeavy || count > mostCritHeavy.count) {
+        mostCritHeavy = { username: (e && e.username) || '?', count: count, rate: rate };
+      }
+    });
+
+    // --- Hit-level trophies (need rotation detail) ---
+    entries.forEach((e) => {
+      if (!e || !e.user_id) return;
+      const key    = encounterId + ':' + e.user_id;
+      const detail = memberDetails[key];
+      const rot    = detail && Array.isArray(detail.rotation) ? detail.rotation : null;
+
+      if (!rot) {
+        // has_detail may be true (detail requested/in-flight) or false (still fighting) —
+        // either way we lack hit data for this member; mark partial.
+        missingDetail = true;
+        return;
+      }
+      membersWithDetail += 1;
+      if (!rot.length) return;
+
+      const uname = (e && e.username) || '?';
+
+      // Hardest single hit
+      rot.forEach((h) => {
+        const dmg = Number(h && h.damage) || 0;
+        if (!hardestHit || dmg > hardestHit.damage) {
+          hardestHit = { username: uname, skill: (h && h.skill) || 'Unknown', damage: dmg };
+        }
+      });
+
+      // Biggest crit+heavy hit (both flags must be set — highest-roll, 2× multiplier)
+      rot.forEach((h) => {
+        if (!(h && h.is_crit && h.is_heavy)) return;
+        const dmg = Number(h && h.damage) || 0;
+        if (!biggestCritHit || dmg > biggestCritHit.damage) {
+          biggestCritHit = { username: uname, skill: (h && h.skill) || 'Unknown', damage: dmg };
+        }
+      });
+
+      // Highest sustained DPS — rolling WINDOW_SEC window
+      // Sort hits by time, accumulate damage within each window.
+      const sorted = rot.slice().sort((a, b) => ((a && a.relative_time) || 0) - ((b && b.relative_time) || 0));
+      let winStart = 0;
+      let winDmg   = 0;
+      for (let head = 0; head < sorted.length; head++) {
+        winDmg += Number(sorted[head] && sorted[head].damage) || 0;
+        // Shrink the tail until the window fits within WINDOW_SEC
+        while (winStart < head) {
+          const span = ((sorted[head] && sorted[head].relative_time) || 0)
+                     - ((sorted[winStart] && sorted[winStart].relative_time) || 0);
+          if (span <= WINDOW_SEC) break;
+          winDmg -= Number(sorted[winStart] && sorted[winStart].damage) || 0;
+          winStart++;
+        }
+        const span = Math.max(
+          WINDOW_SEC,
+          ((sorted[head] && sorted[head].relative_time) || 0)
+            - ((sorted[winStart] && sorted[winStart].relative_time) || 0)
+        );
+        const sustDps = winDmg / span;
+        if (!highestSustainedDps || sustDps > highestSustainedDps.dps) {
+          highestSustainedDps = { username: uname, dps: sustDps, windowSec: WINDOW_SEC };
+        }
+      }
+    });
+
+    return {
+      highestSustainedDps,
+      hardestHit,
+      mostDamage,
+      mostCritHeavy,
+      biggestCritHit,
+      missingDetail,
+      totalMembers: entries.length,
+      membersWithDetail,
+    };
+  },
+
+  // trophiesHtml(trophies)
+  //   trophies — result of computeTrophies (or null/undefined for a full empty state)
+  // Renders the full Trophies tab panel HTML. Self-contained — no DOM globals needed.
+  trophiesHtml(trophies) {
+    const esc = PartyRender.escapeHtml;
+    const fnum = PartyRender.fmtNum;
+
+    if (!trophies || !trophies.totalMembers) {
+      return '<div class="party-empty-state">'
+        + '<div class="party-empty-icon">🏆</div>'
+        + '<div class="party-empty-title">No Trophies Yet</div>'
+        + '<div class="party-empty-text">Trophies appear after the encounter ends and member data is loaded.</div>'
+        + '</div>';
+    }
+
+    const t = trophies;
+
+    // Loading nudge — shown as a small banner if some members are still missing rotation data.
+    const loadingBanner = t.missingDetail
+      ? '<div class="pr-trophy-loading">'
+        + '⏳ Loading breakdowns for '
+        + (t.totalMembers - t.membersWithDetail)
+        + ' member' + (t.totalMembers - t.membersWithDetail !== 1 ? 's' : '')
+        + ' — hit-level trophies will update automatically.'
+        + '</div>'
+      : '';
+
+    // Helper: render one trophy card.
+    // icon, title, winner (string|null), detail (string|null)
+    const card = (icon, title, winner, detail) => {
+      if (!winner) {
+        // Trophy not yet computable (detail missing for all members, or no data at all).
+        return '<div class="pr-trophy-card pr-trophy-pending">'
+          + '<div class="pr-trophy-icon">' + icon + '</div>'
+          + '<div class="pr-trophy-body">'
+          + '<div class="pr-trophy-title">' + title + '</div>'
+          + '<div class="pr-trophy-winner pr-trophy-na">—</div>'
+          + '</div></div>';
+      }
+      return '<div class="pr-trophy-card">'
+        + '<div class="pr-trophy-icon">' + icon + '</div>'
+        + '<div class="pr-trophy-body">'
+        + '<div class="pr-trophy-title">' + title + '</div>'
+        + '<div class="pr-trophy-winner">' + esc(winner) + '</div>'
+        + (detail ? '<div class="pr-trophy-detail">' + detail + '</div>' : '')
+        + '</div></div>';
+    };
+
+    // --- Build each card ---
+
+    // 1. Most Damage (always available from scoreboard)
+    const mostDmgCard = card(
+      '💥',
+      'Most Damage',
+      t.mostDamage ? t.mostDamage.username : null,
+      t.mostDamage ? fnum(t.mostDamage.damage) + ' total' : null
+    );
+
+    // 2. Highest Sustained DPS (rolling 10s window — needs rotation detail)
+    const sustainCard = t.highestSustainedDps
+      ? card(
+          '⚡',
+          'Highest Sustained DPS',
+          t.highestSustainedDps.username,
+          fnum(Math.round(t.highestSustainedDps.dps)) + ' DPS (best ' + t.highestSustainedDps.windowSec + 's window)'
+        )
+      : card('⚡', 'Highest Sustained DPS', null, null);
+
+    // 3. Hardest Single Hit — needs rotation detail
+    const hardHitCard = t.hardestHit
+      ? card(
+          '🎯',
+          'Hardest Single Hit',
+          t.hardestHit.username,
+          esc(t.hardestHit.skill) + ' · ' + fnum(t.hardestHit.damage)
+        )
+      : card('🎯', 'Hardest Single Hit', null, null);
+
+    // 4. Biggest Crit+Heavy Hit — needs rotation detail (both is_crit AND is_heavy)
+    const bigCritCard = t.biggestCritHit
+      ? card(
+          '💢',
+          'Biggest Crit+Heavy Hit',
+          t.biggestCritHit.username,
+          esc(t.biggestCritHit.skill) + ' · ' + fnum(t.biggestCritHit.damage)
+        )
+      : card('💢', 'Biggest Crit+Heavy Hit', null, null);
+
+    // 5. Most Crit+Heavy Hits (count + rate — from scoreboard stats, always available)
+    const critHeavyCard = t.mostCritHeavy && t.mostCritHeavy.count > 0
+      ? card(
+          '✨',
+          'Most Crit+Heavy Hits',
+          t.mostCritHeavy.username,
+          t.mostCritHeavy.count + ' hits · ' + t.mostCritHeavy.rate.toFixed(1) + '% C+H rate'
+        )
+      : card('✨', 'Most Crit+Heavy Hits', null, null);
+
+    return '<div class="pr-trophies">'
+      + loadingBanner
+      + '<div class="pr-trophy-grid">'
+      + mostDmgCard
+      + sustainCard
+      + hardHitCard
+      + bigCritCard
+      + critHeavyCard
+      + '</div>'
+      + '</div>';
+  },
 };
         /* @end:party_render */
         /* @inject:member-detail-tabs — GENERATED from /src/js/member-detail-tabs.js by build.py; edit the SOURCE, not here */
@@ -25086,6 +25453,10 @@ const PartyRender = {
             if (tab === 'rotation') { renderPartyRotationTab(); return; }
             if (tab === 'compare')  { renderPartyCompareTab();  return; }
             if (tab === 'history')  { renderPartyHistoryTab();  return; }
+            // TODO (dispatcher — integration step): add the Trophies tab button to
+            // index.html's #partyTabStrip (line ~10962) — one line:
+            //   <button class="party-tab" data-ptab="trophies" onclick="switchPartyTab('trophies')">Trophies</button>
+            if (tab === 'trophies') { renderPartyTrophiesTab(); return; }
             // Phase 3 (C3): if drilled into a member, render their detail panel instead of the board.
             if (partyState.detail) { renderMemberDetail(); return; }
             // Resolve which encounter's board to show: the explicitly-viewed one, else the active.
@@ -25322,6 +25693,38 @@ const PartyRender = {
                 if (other) partyState.compare[slot === 'a' ? 'b' : 'a'] = other.user_id;
             }
             renderPartyResults();
+        }
+
+        // ===== Trophies tab — post-fight superlatives =====
+        // Computes 5 awards from scoreboard totals (always available) + per-hit rotation
+        // detail (lazily fetched via ensureMemberDetail). Kicks off any missing fetches so
+        // the tab self-heals: once a member's detail arrives, the next render pass fills in
+        // the hit-level trophies (Hardest Hit, Biggest Crit+Heavy, Highest Sustained DPS).
+        function renderPartyTrophiesTab() {
+            const container = document.getElementById('partyResultsContainer');
+            const board = currentPartyBoard();
+            const entries = (board && Array.isArray(board.entries)) ? board.entries : [];
+
+            if (!entries.length) {
+                container.innerHTML = '<div class="party-empty-state">'
+                    + '<div class="party-empty-icon">🏆</div>'
+                    + '<div class="party-empty-title">No Trophies Yet</div>'
+                    + '<div class="party-empty-text">Start an encounter to earn trophies.</div>'
+                    + '</div>';
+                return;
+            }
+
+            const encId = board.encounter_id;
+
+            // Kick off detail fetches for every member that has stored breakdown but
+            // whose detail we haven't received yet. This is the same pattern used by
+            // the Skills/Rotation tabs — rate-safe + event-driven (one fetch per member).
+            entries.forEach((e) => {
+                if (e && e.user_id) ensureMemberDetail(encId, e.user_id);
+            });
+
+            const trophies = PartyRender.computeTrophies(entries, partyState.memberDetails, encId);
+            container.innerHTML = PartyRender.trophiesHtml(trophies);
         }
 
         function renderPartyHistoryTab() {
