@@ -702,14 +702,25 @@ export class PartyRoom {
 
   async _sendMemberDetail(ws, encounter_id, user_id) {
     let detail = { skills: null, rotation: null };
+    let found = false;
     try {
       this._ensureTables();
       const rows = [...this.ctx.storage.sql.exec(
         "SELECT blob FROM member_detail WHERE encounter_id = ? AND user_id = ?",
         String(encounter_id || ""), String(user_id || "")
       )];
-      if (rows.length && rows[0].blob) detail = JSON.parse(rows[0].blob);
+      if (rows.length && rows[0].blob) { detail = JSON.parse(rows[0].blob); found = true; }
     } catch (_) {}
+    // Observability (2026-05-31): the drill-down detail fetch was a blind spot — logging every
+    // request bisects client-not-sending vs server-not-finding (keying) vs client-not-rendering.
+    logEvent("get_member_detail", {
+      encounter_id: encounter_id != null ? String(encounter_id) : null,
+      user_id: user_id != null ? String(user_id) : null,
+      found,
+      has_skills: !!(detail && detail.skills),
+      has_rotation: !!(detail && detail.rotation),
+      rotation_n: (detail && Array.isArray(detail.rotation)) ? detail.rotation.length : 0,
+    });
     try {
       ws.send(JSON.stringify({
         type: "member_detail", encounter_id, user_id,
