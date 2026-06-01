@@ -33,14 +33,16 @@
             transition: width 0.25s ease;
             overflow: hidden;
         }
-        .sidebar.collapsed {
+        /* Collapsed state is scoped to :not(:hover) so hovering a collapsed sidebar flies it
+           back open (width transition makes it glide); leaving re-collapses. */
+        .sidebar.collapsed:not(:hover) {
             width: 48px;
         }
-        .sidebar.collapsed .sidebar-content,
-        .sidebar.collapsed .controls {
+        .sidebar.collapsed:not(:hover) .sidebar-content,
+        .sidebar.collapsed:not(:hover) .controls {
             display: none !important;
         }
-        .sidebar.collapsed .sidebar-header {
+        .sidebar.collapsed:not(:hover) .sidebar-header {
             height: 48px;
             padding: 0;
             display: flex;
@@ -50,10 +52,10 @@
             background: none;
             overflow: hidden;
         }
-        .sidebar.collapsed .sidebar-header > *:not(.sidebar-collapse-btn) {
+        .sidebar.collapsed:not(:hover) .sidebar-header > *:not(.sidebar-collapse-btn) {
             display: none !important;
         }
-        .sidebar.collapsed .sidebar-collapse-btn {
+        .sidebar.collapsed:not(:hover) .sidebar-collapse-btn {
             position: static;
             display: flex !important;
         }
@@ -77,7 +79,7 @@
             flex-shrink: 0;
         }
         .sidebar-collapse-btn:hover { background: rgba(255,255,255,0.12); color: #e2e8f0; }
-        .sidebar.collapsed .sidebar-collapse-btn {
+        .sidebar.collapsed:not(:hover) .sidebar-collapse-btn {
             position: static;
             display: flex !important;
         }
@@ -90,7 +92,7 @@
             flex: 1;
             border-top: 1px solid #334155;
         }
-        .sidebar.collapsed .sidebar-icon-strip {
+        .sidebar.collapsed:not(:hover) .sidebar-icon-strip {
             display: flex !important;
         }
         .sidebar-icon-btn {
@@ -5603,13 +5605,13 @@
         /* Active Party View */
         .party-layout {
             display: flex;
-            gap: 24px;
+            gap: 16px;
             min-height: 500px;
         }
 
         /* Left Sidebar */
         .party-sidebar {
-            width: 260px;
+            width: 210px;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
@@ -5620,7 +5622,7 @@
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid #334155;
             border-radius: 8px;
-            padding: 14px;
+            padding: 12px;
         }
 
         .party-sidebar-header {
@@ -12102,19 +12104,90 @@
             showWelcomeModal();
         }
 
+        // ── Solo Lab dropdown state ──────────────────────────────────────────
+        // soloLabTabNames: the 9 tabs hidden inside the overflow menu
+        const soloLabTabNames = new Set([
+            'buildTesting', 'saved', 'compare',
+            'fullEncounter', 'runSummary',
+            'skillSettings', 'skillAssign', 'targetAssign', 'log'
+        ]);
+
+        // ── Sidebar auto-collapse state ──────────────────────────────────────
+        // Track whether the user had the sidebar collapsed BEFORE we auto-collapsed
+        // it for Party DPS, so we can restore their preference when they leave.
+        let _sidebarWasCollapsedBeforeParty = false;
+        let _partyAutoCollapsed = false;   // true while auto-collapse is in effect
+
+        // Helper: sync the Solo Lab toggle's has-active class
+        function syncSoloLabActiveState() {
+            const toggle = document.getElementById('soloLabToggle');
+            if (!toggle) return;
+            // Check whether any tab inside the dropdown is currently active
+            const anyChildActive = document.querySelector('#soloLabDropdown .tab.active') !== null;
+            toggle.classList.toggle('has-active', anyChildActive);
+        }
+
+        // Helper: collapse/restore sidebar when switching tabs
+        function handleSidebarForTab(tabName) {
+            const sidebar = document.getElementById('mainSidebar');
+            const btn = document.getElementById('sidebarCollapseBtn');
+            if (!sidebar || !btn) return;
+
+            if (tabName === 'partyDps') {
+                if (!_partyAutoCollapsed) {
+                    // Remember current state before we touch it
+                    _sidebarWasCollapsedBeforeParty = sidebar.classList.contains('collapsed');
+                    _partyAutoCollapsed = true;
+                }
+                // Force-collapse for Party DPS
+                sidebar.classList.add('collapsed');
+                btn.textContent = '›';
+                btn.title = 'Expand sidebar';
+            } else {
+                if (_partyAutoCollapsed) {
+                    _partyAutoCollapsed = false;
+                    // Restore to whatever the user had before
+                    if (_sidebarWasCollapsedBeforeParty) {
+                        sidebar.classList.add('collapsed');
+                        btn.textContent = '›';
+                        btn.title = 'Expand sidebar';
+                    } else {
+                        sidebar.classList.remove('collapsed');
+                        btn.textContent = '‹';
+                        btn.title = 'Collapse sidebar';
+                    }
+                }
+                // If _partyAutoCollapsed is false, user is manually managing the sidebar — don't touch it
+            }
+        }
+
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
+                // The Solo Lab ▾ toggle also carries class="tab" (for styling) but has no
+                // data-tab — skip it here so its own dropdown listener handles it and we don't
+                // getElementById('tab-undefined') -> blank the screen.
+                if (!tab.dataset.tab) return;
+                // If this tab is inside the Solo Lab dropdown, close the dropdown
+                const dropdown = document.getElementById('soloLabDropdown');
+                if (dropdown) dropdown.classList.remove('open');
+
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
                 tab.classList.add('active');
                 document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-                
+
+                // Sync Solo Lab toggle active indicator
+                syncSoloLabActiveState();
+
+                // Auto-collapse/restore sidebar for Party DPS
+                handleSidebarForTab(tab.dataset.tab);
+
                 // Load Run Summary when tab is opened
                 if (tab.dataset.tab === 'runSummary') {
                     loadRunSummary();
                 }
-                
+
                 // Load target assignments when tab is opened
                 if (tab.dataset.tab === 'targetAssign') {
                     if (!targetAssignmentsLoaded) {
@@ -12130,24 +12203,47 @@
                         updateTargetAssignmentDisplay();
                     }
                 }
-                
+
                 // Refresh encounter history when switching to Encounters tab
                 if (tab.dataset.tab === 'encounters') {
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         sendCommand('get_encounter_history');
                     }
                 }
-                
+
                 // Initialize Run Builder class dropdown when tab is opened
                 if (tab.dataset.tab === 'fullEncounter') {
                     const runClassSelect = document.getElementById('runClassSelect');
                     if (runClassSelect && runClassSelect.options.length <= 1) {
-                        runClassSelect.innerHTML = '<option value="">-- Class --</option>' + 
+                        runClassSelect.innerHTML = '<option value="">-- Class --</option>' +
                             TL_CLASSES.map(c => `<option value="${c.name}">${c.name}: ${c.weapons}</option>`).join('');
                     }
                 }
             });
         });
+
+        // ── Solo Lab dropdown toggle ─────────────────────────────────────────
+        (function initSoloLabDropdown() {
+            const toggle = document.getElementById('soloLabToggle');
+            const dropdown = document.getElementById('soloLabDropdown');
+            if (!toggle || !dropdown) return;
+
+            // Open/close on toggle button click
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+            });
+
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                if (!document.getElementById('soloLabWrapper').contains(e.target)) {
+                    dropdown.classList.remove('open');
+                }
+            });
+
+            // Sync initial state (Dashboard is active, no Solo Lab child is active)
+            syncSoloLabActiveState();
+        })();
 
         function updateLicenseInfo(license) {
             const container = document.getElementById('versionInfo');
@@ -23510,6 +23606,7 @@ ${attemptLine}
         let partyPingInterval = null;  // keepalive
         let expirationInterval = null; // expiration display timer
         let partyLiveHitDebounce = null; // trailing-debounce timer for live hydration posts
+        let bannerRefreshInterval = null; // #14 banner periodic refresh (3 s, active-party only)
 
         function startPartyPing() {
             stopPartyPing();
@@ -23521,6 +23618,19 @@ ${attemptLine}
         }
         function stopPartyPing() {
             if (partyPingInterval) { clearInterval(partyPingInterval); partyPingInterval = null; }
+        }
+
+        // #14 banner auto-refresh — keeps the own-client log-status banner live while in a party
+        // even when the diagnostics panel is closed (the only other refresh path).
+        // Cadence: every 3 s. Only runs while the party socket is open; cleared on disconnect.
+        function startBannerRefresh() {
+            if (bannerRefreshInterval) { clearInterval(bannerRefreshInterval); bannerRefreshInterval = null; }
+            bannerRefreshInterval = setInterval(function() {
+                renderLogStatusBanner();
+            }, 3000);
+        }
+        function stopBannerRefresh() {
+            if (bannerRefreshInterval) { clearInterval(bannerRefreshInterval); bannerRefreshInterval = null; }
         }
 
         // Open (or re-open) the room socket. isLeader is passed to the room as a query param.
@@ -23548,6 +23658,7 @@ ${attemptLine}
                 partyDebug('party.open', { code: code });
                 partyWSConnected = true;
                 startPartyPing();
+                startBannerRefresh();
                 startExpirationTimer();
                 if (diagnosticsOpen) refreshDiagnostics();
             };
@@ -23587,6 +23698,7 @@ ${attemptLine}
             partyWSWantOpen = false;
             if (partyWSReconnect) { clearTimeout(partyWSReconnect); partyWSReconnect = null; }
             stopPartyPing();
+            stopBannerRefresh();
             stopExpirationTimer();
             if (partyWS) { try { partyWS.onclose = null; partyWS.close(); } catch (e) {} partyWS = null; }
             partyWSConnected = false;

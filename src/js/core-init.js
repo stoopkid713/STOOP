@@ -258,6 +258,10 @@
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
+                // The Solo Lab ▾ toggle also carries class="tab" (for styling) but has no
+                // data-tab — skip it here so its own dropdown listener handles it and we don't
+                // getElementById('tab-undefined') -> blank the screen.
+                if (!tab.dataset.tab) return;
                 // If this tab is inside the Solo Lab dropdown, close the dropdown
                 const dropdown = document.getElementById('soloLabDropdown');
                 if (dropdown) dropdown.classList.remove('open');
