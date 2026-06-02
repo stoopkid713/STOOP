@@ -284,6 +284,27 @@ export default {
     // Feedback intake (KV-only). Handler self-handles OPTIONS preflight + method.
     if (url.pathname === "/feedback") return handleFeedback(request, env);
 
+    // Active-room registry (Obs #4, part B): GET /rooms?key=<DEBUG_KEY> -> live parties.
+    // Same DEBUG_KEY gate as /debug (unset -> 404 invisible; wrong key -> 403). DOs can't be
+    // enumerated, so each room maintains a `room:<CODE>` summary in ROOMS_KV; we list it. The
+    // summary rides in KV metadata, so this is ONE list() call (no per-key gets).
+    if (url.pathname === "/rooms") {
+      if (!env.DEBUG_KEY) return new Response("not found", { status: 404 });
+      if (url.searchParams.get("key") !== env.DEBUG_KEY) {
+        return new Response("forbidden", { status: 403 });
+      }
+      if (!env.ROOMS_KV) {
+        return new Response(JSON.stringify({ active_rooms: 0, rooms: [], note: "ROOMS_KV not bound" }, null, 2),
+          { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+      }
+      const { keys } = await env.ROOMS_KV.list({ prefix: "room:" });
+      const rooms = keys
+        .map((k) => ({ code: k.name.slice(5), ...(k.metadata || {}) }))
+        .sort((a, b) => (b.last_activity || 0) - (a.last_activity || 0));
+      return new Response(JSON.stringify({ active_rooms: rooms.length, ts: Date.now(), rooms }, null, 2),
+        { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    }
+
     return new Response("not found", { status: 404 });
   },
 };
@@ -342,6 +363,11 @@ export class PartyRoom {
         last_seen: Date.now(),
       };
       await this.ctx.storage.put("members", members);
+      // Stamp the room's identity once so the registry writer (no request URL) knows its own
+      // code + age, then publish this room to the active-room registry (Obs #4 part B).
+      if (!(await this.ctx.storage.get("code"))) await this.ctx.storage.put("code", code);
+      if (!(await this.ctx.storage.get("created_at"))) await this.ctx.storage.put("created_at", Date.now());
+      await this._touchRegistry();
     }
 
     logEvent("join", {
@@ -525,6 +551,7 @@ export class PartyRoom {
           const leaderEntry = allMembers[att.user_id];
           const freshMembers = leaderEntry ? { [att.user_id]: leaderEntry } : {};
           await this.ctx.storage.put("members", freshMembers);
+          await this._touchRegistry(); // roster reset to leader-only (or empty)
           logEvent("reset_roster", { by: att.username, user_id: att.user_id });
           this.broadcast({ type: "roster_reset", by: att.user_id });
           this.broadcast(await this.buildRoster());
@@ -564,6 +591,7 @@ export class PartyRoom {
       await this.ctx.storage.put("members", members);
     }
     logEvent("member_offline", { user_id: att.user_id, username: att.username });
+    await this._touchRegistryThrottled(); // online_count changed; throttled (offline storms)
     this.broadcast(await this.buildRoster());
     this.broadcastExcept(att.user_id, { type: "member_offline", user_id: att.user_id });
   }
@@ -590,6 +618,7 @@ export class PartyRoom {
     }
     if (evicted.length) {
       await this.ctx.storage.put("members", members);
+      await this._touchRegistry(); // roster shrank (maybe to empty -> deregister)
       for (const uid of evicted) {
         logEvent("ghost_evicted", { user_id: uid });
         this.broadcast({ type: "member_left", user_id: uid });
@@ -846,6 +875,8 @@ export class PartyRoom {
       n_targets: cleanTargets.length,
       has_detail,
     });
+
+    await this._touchRegistryThrottled(); // keep last_activity fresh during combat (≤1 write/30s)
   }
 
   // --- per-member heavy detail (Phase 3 / C1): SQLite-backed, off the KV board blob ---
@@ -893,6 +924,7 @@ export class PartyRoom {
       this.ctx.storage.sql.exec("DELETE FROM submissions WHERE user_id = ?", user_id);
       this.ctx.storage.sql.exec("DELETE FROM member_detail WHERE user_id = ?", user_id);
     } catch (_) {}
+    await this._touchRegistry(); // roster changed (leave/kick); deregisters if now empty
   }
 
   // --- boss detection (server-side, cross-party convergence) ---
@@ -1178,6 +1210,50 @@ export class PartyRoom {
         headers: { "Content-Type": "application/json" },
       });
     }
+  }
+
+  // --- Obs #4 part B: active-room registry ---
+  // Publish (or remove) this room's summary in ROOMS_KV so the worker's GET /rooms can list
+  // live parties without enumerating DOs (the /debug endpoint x-rays a code you already know;
+  // /rooms answers "how many parties are live right now"). Called on every roster mutation.
+  // The summary rides in KV metadata so /rooms is a single list() with no per-key gets. An
+  // expirationTtl is the safety net: a room that crashes without a clean leave falls off on its
+  // own. Empty room -> delete the key (deregister). Guards a missing binding.
+  async _touchRegistry() {
+    this._lastReg = Date.now(); // reset the post_fight throttle window on any roster event
+    if (!this.env.ROOMS_KV) return;
+    try {
+      const code = await this.ctx.storage.get("code");
+      if (!code) return;
+      const key = "room:" + code;
+      const members = (await this.ctx.storage.get("members")) || {};
+      const ids = Object.keys(members);
+      if (!ids.length) { await this.env.ROOMS_KV.delete(key); return; }
+      const online = new Set(
+        this.ctx.getWebSockets().map((ws) => (ws.deserializeAttachment() || {}).user_id)
+      );
+      const leader = Object.values(members).find((m) => m.is_leader);
+      const summary = {
+        member_count: ids.length,
+        online_count: ids.filter((u) => online.has(u)).length,
+        leader: leader ? leader.username : null,
+        created_at: (await this.ctx.storage.get("created_at")) || Date.now(),
+        last_activity: Date.now(),
+      };
+      // 2 h TTL: comfortably longer than a real session; a stuck/orphaned room still expires.
+      await this.env.ROOMS_KV.put(key, JSON.stringify(summary), {
+        metadata: summary, expirationTtl: 7200,
+      });
+    } catch (_) {}
+  }
+
+  // Throttled variant for high-frequency events (post_fight, offline storms): at most one
+  // registry write per 30 s, keeping well under KV's per-key write limit. Roster events call
+  // _touchRegistry directly (and reset this window) so transitions are never missed.
+  async _touchRegistryThrottled() {
+    const now = Date.now();
+    if (this._lastReg && now - this._lastReg < 30_000) return;
+    await this._touchRegistry();
   }
 
   // --- broadcast helpers ---

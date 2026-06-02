@@ -28,6 +28,16 @@ new_sqlite_classes = ["PartyRoom"]
 binding = "FEEDBACK_KV"
 id = "a61e7c1245a14bcc9c96b3cec7da6318"
 
+# Active-room registry (Observability #4, part B — complements the per-room /debug x-ray).
+# DOs can't be enumerated, so each PartyRoom writes a `room:<CODE>` summary here on roster
+# changes; GET /rooms?key=<DEBUG_KEY> lists live parties (the "how many parties right now"
+# signal). Summary rides in KV metadata so /rooms is one list() call. Records carry a 2h
+# expirationTtl safety-net. All writes guard a missing binding, so the worker still serves
+# if this is ever absent.
+[[kv_namespaces]]
+binding = "ROOMS_KV"
+id = "c28515495a524a2bbe2e7fc7c02d78f5"
+
 # Observability #4 debug endpoint auth key.
 # Production: set via `wrangler secret put DEBUG_KEY` (encrypted, never in source).
 # Local dev:  set DEBUG_KEY=<value> in workers/party/.dev.vars (gitignored).

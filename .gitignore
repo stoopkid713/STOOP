@@ -34,3 +34,4 @@ backend/tools/_refresh_cache/
 overlay/src-tauri/target/
 overlay/src-tauri/gen/
 
+_test-obs.mjs
