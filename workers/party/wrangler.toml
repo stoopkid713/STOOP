@@ -38,9 +38,10 @@ id = "a61e7c1245a14bcc9c96b3cec7da6318"
 binding = "ROOMS_KV"
 id = "c28515495a524a2bbe2e7fc7c02d78f5"
 
-# Observability #4 debug endpoint auth key.
-# Production: set via `wrangler secret put DEBUG_KEY` (encrypted, never in source).
-# Local dev:  set DEBUG_KEY=<value> in workers/party/.dev.vars (gitignored).
-# If unset (empty string / absent), the /party/<code>/debug endpoint returns 404.
-[vars]
-DEBUG_KEY = ""
+# Observability #4 debug auth key (gates BOTH /party/<code>/debug and /rooms).
+# Deliberately NOT a [vars] entry: a plaintext var of the same name shadows the secret on
+# every deploy and resets it to "" (the original footgun). Use a secret instead — secrets
+# persist across deploys untouched:
+#   Production: `wrangler secret put DEBUG_KEY`  (encrypted, never in source, durable)
+#   Local dev:  DEBUG_KEY=<value> in workers/party/.dev.vars  (gitignored)
+# If unset/absent, env.DEBUG_KEY is undefined -> both endpoints return 404 (fail-closed).
