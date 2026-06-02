@@ -677,8 +677,72 @@
         
         // Leave party — tell the room, close the socket, reset local state.
         // (Phase 1: leader leaving doesn't kick others — room TTL is an open design point.)
+        //
+        // BUG 2 FIX: persist in-session encounters + boards to localStorage BEFORE clearing
+        // transport state so history survives a leave/re-enter. The data is keyed by the
+        // party code so multiple sessions don't clobber each other. A rolling cap of 3 sessions
+        // (merge with any existing persisted history, newest wins) keeps storage bounded.
+        function persistPartyHistory() {
+            try {
+                const code = partyState.party_code;
+                if (!code) return;
+                const encs = partyState.encounters || [];
+                if (!encs.length) return;
+                const entry = {
+                    party_code: code,
+                    saved_at: new Date().toISOString(),
+                    encounters: encs,
+                    boards: partyState.boards || {}
+                };
+                let history = [];
+                try { history = JSON.parse(localStorage.getItem('party_history') || '[]'); } catch (e) {}
+                if (!Array.isArray(history)) history = [];
+                // Remove any prior entry for this same party code, then prepend new.
+                history = history.filter((h) => h.party_code !== code);
+                history.unshift(entry);
+                // Keep at most 3 recent sessions.
+                if (history.length > 3) history = history.slice(0, 3);
+                localStorage.setItem('party_history', JSON.stringify(history));
+                console.log('[Party] Persisted history for', code, '—', encs.length, 'encounters');
+            } catch (e) {
+                console.warn('[Party] Failed to persist party history:', e);
+            }
+        }
+
+        // Reload persisted party history into partyState for off-session viewing.
+        // Called by renderPartyHistoryTab when encounters is empty (user not in a party).
+        function loadPersistedPartyHistory() {
+            try {
+                const raw = localStorage.getItem('party_history');
+                if (!raw) return;
+                const history = JSON.parse(raw);
+                if (!Array.isArray(history) || !history.length) return;
+                // Flatten all sessions into partyState.encounters + boards (dedup by encounter_id).
+                const seenIds = new Set((partyState.encounters || []).map((e) => e.encounter_id));
+                const merged = [...(partyState.encounters || [])];
+                const boards = Object.assign({}, partyState.boards || {});
+                for (const session of history) {
+                    for (const enc of (session.encounters || [])) {
+                        if (!seenIds.has(enc.encounter_id)) {
+                            seenIds.add(enc.encounter_id);
+                            merged.push(enc);
+                        }
+                    }
+                    Object.assign(boards, session.boards || {});
+                }
+                partyState.encounters = merged;
+                partyState.boards = boards;
+                console.log('[Party] Loaded persisted history — total encounters:', merged.length);
+            } catch (e) {
+                console.warn('[Party] Failed to load persisted party history:', e);
+            }
+        }
+
         async function leaveParty() {
             if (!await partyConfirm('Leave this party?')) return;
+
+            // BUG 2 FIX: persist before clearing so session history survives the leave.
+            persistPartyHistory();
 
             try {
                 if (partyWS && partyWS.readyState === WebSocket.OPEN) {

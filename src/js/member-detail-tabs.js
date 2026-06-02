@@ -2,6 +2,8 @@
         // Phase 2 (A5): repurpose the old Targets dropdown into the encounter switcher.
         // Lists every stored encounter (oldest-first), with a category icon, boss, time, and an
         // attempt ordinal (#1/#2) for duplicate bosses; the live/active one is marked ●.
+        // BUG 1 FIX: no-boss ("Recording…") entries are hidden from the list UNLESS they are
+        // the currently-active/live encounter (always keep the one recording visible).
         function renderEncounterSwitcher() {
             const sel = document.getElementById('partyTargetFilter');
             if (!sel) return;
@@ -10,12 +12,18 @@
                 sel.innerHTML = '<option value="">No encounters yet</option>';
                 return;
             }
+            const activeId = partyState.active_encounter_id;
+            // Filter: keep boss-resolved encounters + the active/live one (even if no boss yet).
+            const visible = list.filter((e) => e.boss || (e.encounter_id === activeId && !e.ended));
+            if (!visible.length) {
+                sel.innerHTML = '<option value="">No encounters yet</option>';
+                return;
+            }
             // Count boss occurrences first so duplicates get ordinals.
             const totalByBoss = {};
-            list.forEach((e) => { const k = (e.boss || '∅').toLowerCase(); totalByBoss[k] = (totalByBoss[k] || 0) + 1; });
+            visible.forEach((e) => { const k = (e.boss || '∅').toLowerCase(); totalByBoss[k] = (totalByBoss[k] || 0) + 1; });
             const seen = {};
-            const activeId = partyState.active_encounter_id;
-            sel.innerHTML = list.map((e) => {
+            sel.innerHTML = visible.map((e) => {
                 const k = (e.boss || '∅').toLowerCase();
                 seen[k] = (seen[k] || 0) + 1;
                 const ord = totalByBoss[k] > 1 ? ` #${seen[k]}` : '';
@@ -377,6 +385,11 @@
 
         function renderPartyHistoryTab() {
             const container = document.getElementById('partyResultsContainer');
+            // BUG 2 FIX: if we have no encounters in live state (e.g. after leaving a party),
+            // attempt to reload persisted history from localStorage before rendering.
+            if (!(partyState.encounters || []).length && typeof loadPersistedPartyHistory === 'function') {
+                loadPersistedPartyHistory();
+            }
             const list = (partyState.encounters || []).slice().reverse(); // newest first
             if (!list.length) {
                 container.innerHTML = `<div class="party-empty-state"><div class="party-empty-icon">📜</div><div class="party-empty-text">No encounters recorded yet.</div></div>`;
