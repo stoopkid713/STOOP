@@ -8748,6 +8748,411 @@
             border-right: 2px solid #64748b;
             border-bottom: 2px solid #64748b;
         }
+
+        /* =============================================================
+           RESPONSIVE BREAKPOINTS — Bug 19
+           Coexistence with zoom/100vh: applyZoom() overrides body.zoom,
+           body.minHeight, body.width, and .app.height via inline styles.
+           These breakpoints are purely CSS-class/structural — they do NOT
+           touch height/min-height/width in ways that fight the zoom
+           compensation. No 100vh or 100vw appears in these rules;
+           height adjustments here use flex or overflow instead.
+           =============================================================
+
+           Tier 1 – ~1280px wide  : standard laptop / half of 1440p
+           Tier 2 – ~960px wide   : half of 1920, common gamer snap
+           Tier 3 – ~720px wide   : quarter of 1920 / narrow snap
+           Tier 4 – ~640px wide   : very narrow / portrait tall-window
+           Tall-narrow extra      : viewport is taller than it is wide
+           ============================================================= */
+
+        /* ---- Tier 1: ≤1280px ----------------------------------------
+           Slightly compact the sidebar, main-header, and tabs.
+           Prevents left-side content from pushing tabs off-screen.
+        ---------------------------------------------------------------- */
+        @media (max-width: 1280px) {
+            .sidebar {
+                width: 240px;
+            }
+            .sidebar-header {
+                height: 130px;
+                padding: 14px 16px;
+            }
+            .main-header {
+                height: 130px;
+                padding: 14px 20px;
+            }
+            .main-header-line1 {
+                font-size: 1.3rem;
+                margin-bottom: 6px;
+            }
+            .main-header-game-title {
+                font-size: 2.8rem;
+            }
+            .tab {
+                padding: 10px 14px;
+                font-size: 0.8rem;
+            }
+            .tab-content {
+                padding: 16px;
+            }
+            .dashboard-stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            }
+        }
+
+        /* ---- Tier 2: ≤960px -----------------------------------------
+           Half of 1920 — very common for side-by-side gaming.
+           Collapse sidebar to icon strip automatically (no user toggle).
+           Compact header further; shrink tab text.
+        ---------------------------------------------------------------- */
+        @media (max-width: 960px) {
+            /* Force sidebar into icon-strip mode */
+            .sidebar {
+                width: 48px;
+                flex-shrink: 0;
+            }
+            .sidebar .sidebar-content,
+            .sidebar .controls {
+                display: none !important;
+            }
+            .sidebar .sidebar-header {
+                height: 48px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-bottom: none;
+                background: none;
+                overflow: hidden;
+            }
+            .sidebar .sidebar-header > *:not(.sidebar-collapse-btn) {
+                display: none !important;
+            }
+            .sidebar .sidebar-collapse-btn {
+                position: static;
+                display: flex !important;
+            }
+            .sidebar .sidebar-icon-strip {
+                display: flex !important;
+            }
+
+            /* Compact main header */
+            .main-header {
+                height: 100px;
+                padding: 10px 16px;
+            }
+            .main-header-line1 {
+                font-size: 1.1rem;
+                margin-bottom: 4px;
+            }
+            .main-header-line2 {
+                font-size: 0.72rem;
+            }
+            .main-header-line3 {
+                font-size: 0.65rem;
+            }
+            .main-header-game-title {
+                font-size: 2rem;
+                letter-spacing: 0.2em;
+            }
+
+            /* Tabs: allow wrapping so they don't get clipped */
+            .tabs {
+                flex-wrap: wrap;
+                padding: 0 12px;
+                gap: 2px;
+            }
+            .tab {
+                padding: 8px 10px;
+                font-size: 0.75rem;
+            }
+
+            /* Encounters side-panel stacks below on narrow */
+            .encounters-layout {
+                flex-direction: column;
+            }
+            .encounters-list-panel {
+                width: 100%;
+                max-height: 220px;
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            /* Party setup: collapse 2-col sidebar layout */
+            .party-setup-wrapper {
+                grid-template-columns: 1fr;
+            }
+            .party-setup-sidebar {
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            /* Compare/multi-build: 3-col → 2-col */
+            .compare-build-columns {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            /* Rotation segments: 4-col → 2-col */
+            .rotation-segments {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            /* Dashboard stats: 2-col */
+            .dashboard-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            /* Dashboard welcome: hide decorative icon on tiny header */
+            .dashboard-welcome-icon {
+                display: none;
+            }
+            .dashboard-welcome {
+                padding: 16px 20px;
+            }
+
+            /* tab-content padding down */
+            .tab-content {
+                padding: 12px;
+            }
+
+            /* rl-drilldown: 2-col → 1-col */
+            .rl-drilldown-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Build-test inline grid (set via inline style) — we can't
+               override the inline style directly from CSS, but we can
+               ensure the children are scrollable inside the container */
+            .tab-pane#tab-buildTesting > div {
+                overflow-y: auto;
+            }
+        }
+
+        /* ---- Tier 3: ≤720px -----------------------------------------
+           Quarter-screen / very narrow snap.
+           Single-column everything; compact all headers further.
+        ---------------------------------------------------------------- */
+        @media (max-width: 720px) {
+            /* Sidebar fully hidden — reclaim every pixel */
+            .sidebar {
+                display: none;
+            }
+
+            /* Even more compact header */
+            .main-header {
+                height: 72px;
+                padding: 8px 12px;
+            }
+            .main-header-line1 {
+                font-size: 0.9rem;
+                margin-bottom: 2px;
+            }
+            .main-header-line2,
+            .main-header-line3 {
+                display: none;
+            }
+            /* Background wordmark would overlap the title at this width */
+            .main-header-game-title {
+                display: none;
+            }
+            .main-header-bg-text {
+                display: none;
+            }
+            .main-header-math {
+                display: none;
+            }
+            /* Keep graph canvas — it scales fine */
+
+            /* Tabs scroll horizontally instead of wrapping */
+            .tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;         /* Firefox */
+                padding: 0 8px;
+            }
+            .tabs::-webkit-scrollbar { display: none; }
+            .tab {
+                flex-shrink: 0;
+                padding: 7px 9px;
+                font-size: 0.7rem;
+                white-space: nowrap;
+            }
+
+            /* tab-content: minimal padding */
+            .tab-content {
+                padding: 8px;
+            }
+
+            /* Encounters list: very compact */
+            .encounters-list-panel {
+                max-height: 160px;
+            }
+
+            /* Stat cards: single column */
+            .dashboard-stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .dashboard-card-value {
+                font-size: 2rem;
+            }
+
+            /* Class grid: 2 cols */
+            .dashboard-class-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            /* Compare columns: single column */
+            .compare-build-columns {
+                grid-template-columns: 1fr;
+            }
+
+            /* Rotation segments: single column */
+            .rotation-segments {
+                grid-template-columns: 1fr;
+            }
+
+            /* rl-matrix fixed columns overflow gracefully */
+            .rl-matrix,
+            .rl-matrix-header,
+            .rl-matrix-row {
+                overflow-x: auto;
+            }
+
+            /* Run lab header: stack cards */
+            .rl-header {
+                flex-direction: column;
+            }
+
+            /* Piano label column shrink */
+            .rl-piano-skill-label {
+                width: 52px;
+                font-size: 0.56rem;
+            }
+            .rl-piano-time-axis {
+                padding-left: 82px;
+            }
+
+            /* Party setup: stay single-col */
+            .party-setup-wrapper {
+                max-width: 100%;
+            }
+
+            /* Welcome banner compact */
+            .dashboard-welcome {
+                padding: 12px 14px;
+                gap: 12px;
+            }
+            .dashboard-welcome-text h1 {
+                font-size: 1.2rem;
+            }
+            .dashboard-welcome-text p {
+                font-size: 0.85rem;
+            }
+        }
+
+        /* ---- Tier 4: ≤640px -----------------------------------------
+           Very narrow windows / thin sidebars.
+           Maximum density: smallest readable text, icons only in tabs.
+        ---------------------------------------------------------------- */
+        @media (max-width: 640px) {
+            /* Even tighter header */
+            .main-header {
+                height: 56px;
+                padding: 6px 8px;
+            }
+            .main-header-line1 {
+                font-size: 0.8rem;
+            }
+
+            /* Tab badges hidden — reclaim space */
+            .tab-badge {
+                display: none;
+            }
+
+            /* Tabs: shrink further */
+            .tab {
+                padding: 6px 7px;
+                font-size: 0.65rem;
+            }
+
+            /* Solo-lab dropdown: left-edge constrained */
+            .solo-lab-dropdown {
+                left: auto;
+                right: 0;
+                min-width: 140px;
+            }
+
+            /* Content: near-zero padding */
+            .tab-content {
+                padding: 6px;
+            }
+
+            /* Drilldown / detail panels: full width, no side padding */
+            .encounters-detail-panel {
+                padding: 10px 6px;
+            }
+            .rl-drilldown {
+                padding: 10px 8px;
+            }
+
+            /* Class grid: single column on truly tiny windows */
+            .dashboard-class-grid {
+                grid-template-columns: 1fr;
+            }
+
+            /* Enc stats grid: 2-col */
+            .enc-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* ---- Tall-narrow: height > width (portrait orientation) ------
+           Applies on top of the width breakpoints.
+           Primary concern: prevent fixed-height panels from consuming
+           the entire viewport leaving nothing visible below.
+        ---------------------------------------------------------------- */
+        @media (max-height: 800px) and (max-width: 960px) {
+            .main-header {
+                height: 64px;
+                padding: 8px 16px;
+            }
+            .sidebar-header {
+                height: 64px;
+            }
+            .main-header-line1 {
+                font-size: 0.95rem;
+                margin-bottom: 2px;
+            }
+            .main-header-line2,
+            .main-header-line3 {
+                display: none;
+            }
+        }
+
+        @media (max-height: 600px) {
+            /* Very short viewport: compress header to a sliver */
+            .main-header {
+                height: 48px !important;
+                padding: 6px 12px;
+            }
+            .main-header-line1 {
+                font-size: 0.85rem;
+                margin-bottom: 0;
+            }
+            .main-header-line2,
+            .main-header-line3,
+            .main-header-game-title,
+            .main-header-bg-text,
+            .main-header-math {
+                display: none !important;
+            }
+            .sidebar-header {
+                height: 48px !important;
+            }
+        }
     </style>
 </head>
 <body>
