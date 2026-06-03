@@ -1,10 +1,11 @@
 """Gate tests for #14 — logging detection contract.
 
-Verifies the two backend signals that power the Half A own-client banner:
+Verifies the backend signals that power the Half A own-client banner:
   1. ``_stats_envelope`` always includes ``log_info.current_file`` (the log-found signal).
-  2. ``_stats_envelope`` carries the ``party_live_hit`` path that sets ``lastLogActivity``
-     in the frontend (i.e. the emitted frame type is ``party_live_hit`` while a party
-     session is active and hits are flowing).
+  2. ``_stats_envelope`` carries ``log_info.last_combat_age_s`` — the deterministic
+     state-machine signal: None when no combat lines ingested, float seconds otherwise.
+  3. ``_stats_envelope`` carries the ``party_live_hit`` path that sets ``lastLogActivity``
+     in the frontend (retained as legacy fallback; banner state now uses last_combat_age_s).
 
 These are contract checks, not UI tests — they confirm the Python backend emits
 exactly the fields the banner JavaScript reads.
@@ -17,6 +18,102 @@ import pytest
 
 from dps_meter_server import DPSMeterServer
 from party_state import PartyState
+
+
+# ---------------------------------------------------------------------------
+# 3. last_combat_age_s — the new deterministic log-state signal (#14 state machine)
+# ---------------------------------------------------------------------------
+
+class TestLastCombatAgeS:
+    """log_info must include last_combat_age_s: None when no hits ingested,
+    a non-negative float (seconds) after hits are ingested. This is what the
+    frontend uses to distinguish LOGGING_ACTIVE from LOG_PRESENT_NO_RECENT_COMBAT,
+    fixing the game-off stale-log false positive."""
+
+    def test_last_combat_age_s_key_always_present(self, tmp_path):
+        """log_info must always carry the last_combat_age_s key (None or float)."""
+        srv, _ = _server_with_capture(tmp_path)
+        info = srv._log_info()
+        assert "last_combat_age_s" in info, (
+            "log_info must always include last_combat_age_s for the state machine"
+        )
+
+    def test_last_combat_age_s_none_before_any_ingest(self, tmp_path):
+        """Before any lines are ingested, last_combat_age_s must be None — the
+        frontend interprets None as LOG_PRESENT_NO_RECENT_COMBAT (no combat seen)."""
+        srv, _ = _server_with_capture(tmp_path)
+        info = srv._log_info()
+        assert info["last_combat_age_s"] is None, (
+            "last_combat_age_s must be None when no combat lines have been ingested"
+        )
+
+    def test_last_combat_age_s_none_when_no_log_dir(self, tmp_path):
+        """last_combat_age_s must be None when no log dir is configured — the
+        frontend's NO_LOG_FILE state is driven by current_file=None, not age."""
+        nonexistent = str(tmp_path / "nonexistent_logs")
+        srv, _ = _server_with_capture(tmp_path)
+        srv.config["log_path"] = nonexistent
+        info = srv._log_info()
+        assert info["last_combat_age_s"] is None, (
+            "last_combat_age_s must be None when no log dir exists"
+        )
+
+    def test_last_combat_age_s_float_after_ingest(self, tmp_path):
+        """After ingest_lines processes at least one DamageDone line,
+        last_combat_age_s must be a non-negative float."""
+        srv, _ = _server_with_capture(tmp_path)
+
+        srv.ingest_lines([
+            _line("20260601-10:00:00:000", "Slash", 1000, False, False, "Boss"),
+        ])
+
+        info = srv._log_info()
+        age = info["last_combat_age_s"]
+        assert isinstance(age, float), (
+            f"last_combat_age_s must be float after ingest, got {type(age)}: {age!r}"
+        )
+        assert age >= 0, f"last_combat_age_s must be >= 0, got {age}"
+
+    def test_last_combat_age_s_increases_over_time(self, tmp_path):
+        """Two consecutive calls without new ingest must return increasing values,
+        confirming it is wall-clock age and not a cached constant."""
+        import time
+        srv, _ = _server_with_capture(tmp_path)
+
+        srv.ingest_lines([
+            _line("20260601-10:00:00:000", "Slash", 1000, False, False, "Boss"),
+        ])
+
+        age1 = srv._log_info()["last_combat_age_s"]
+        time.sleep(0.05)  # 50 ms — enough for a measurable delta
+        age2 = srv._log_info()["last_combat_age_s"]
+
+        assert age2 > age1, (
+            f"last_combat_age_s must grow between calls: {age1} -> {age2}"
+        )
+
+    def test_last_combat_age_s_resets_on_new_ingest(self, tmp_path):
+        """Ingesting a newer combat line must lower last_combat_age_s (reset the
+        clock), confirming the backend updates _last_combat_ts per-hit."""
+        import time
+        srv, _ = _server_with_capture(tmp_path)
+
+        # First ingest — old timestamp in log line but _last_combat_ts = datetime.now() copy
+        srv.ingest_lines([
+            _line("20260601-10:00:00:000", "Slash", 1000, False, False, "Boss"),
+        ])
+        time.sleep(0.05)
+        age_before = srv._log_info()["last_combat_age_s"]
+
+        # Second ingest — a later log line; _last_combat_ts is refreshed
+        srv.ingest_lines([
+            _line("20260601-10:00:01:000", "Slash", 500, False, False, "Boss"),
+        ])
+        age_after = srv._log_info()["last_combat_age_s"]
+
+        assert age_after < age_before, (
+            f"second ingest must reset age clock: {age_before:.3f}s -> {age_after:.3f}s"
+        )
 
 
 # ---------------------------------------------------------------------------

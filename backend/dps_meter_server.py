@@ -128,6 +128,12 @@ class DPSMeterServer:
         # broadcast loop can push a fresh suggested_names message the moment a new
         # combat-log file first appears (e.g. the user enabled logging after launch).
         self._last_log_file: Optional[str] = None
+        # #14 LOGGING STATE MACHINE — timestamp of the last successfully parsed
+        # combat line, used to compute last_combat_age_s in _log_info().
+        # Updated by ingest_lines() on every hit that passes the cutoff filter.
+        # None = no combat lines have been ingested yet this session (covers
+        # fresh launches, no-log-dir case, and log files with no DamageDone rows).
+        self._last_combat_ts: Optional[datetime] = None
 
     # --- lifecycle ---------------------------------------------------------
     async def start(self) -> "DPSMeterServer":
@@ -324,6 +330,9 @@ class DPSMeterServer:
                 continue
             self.stats.add_partial(partial)
             added += 1
+            # #14 LOGGING STATE MACHINE: track last ingested combat-line timestamp so
+            # _log_info() can compute last_combat_age_s (deterministic log-activity signal).
+            self._last_combat_ts = partial["_timestamp"]
             # Contract 1: auto-arm the party encounter on the first combat hit once a
             # party session has been registered (_party_session_active). This removes
             # the requirement for a manual "Start" button click before data is
@@ -512,15 +521,26 @@ class DPSMeterServer:
         d = self._log_dir()
         if d is None:
             return {"current_file": None, "file_count": 0,
-                    "file_size": "0 B", "folder_size": "0 B"}
+                    "file_size": "0 B", "folder_size": "0 B",
+                    "last_combat_age_s": None}
         txts = sorted(d.glob("*.txt"))
         latest = max(txts, default=None, key=lambda f: f.name)
         folder = sum(f.stat().st_size for f in txts)
+        # #14 LOGGING STATE MACHINE: last_combat_age_s is the age (seconds, float)
+        # of the last ingested combat line vs. now. null when no line has been
+        # ingested (no combat seen since app launch, or no log file). The frontend
+        # uses this to distinguish LOGGING_ACTIVE (age <= COMBAT_STALE_S) from
+        # LOG_PRESENT_NO_RECENT_COMBAT (file exists but combat is stale/absent) —
+        # fixing the game-off false-positive where a stale log file read as GREEN.
+        last_age: Optional[float] = None
+        if self._last_combat_ts is not None:
+            last_age = (datetime.now() - self._last_combat_ts).total_seconds()
         return {
             "current_file": latest.name if latest else None,
             "file_count": len(txts),
             "file_size": _human_size(latest.stat().st_size) if latest else "0 B",
             "folder_size": _human_size(folder),
+            "last_combat_age_s": last_age,
         }
 
     def _active_log_file(self) -> Optional[Path]:
