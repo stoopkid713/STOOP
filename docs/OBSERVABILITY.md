@@ -76,8 +76,18 @@ All gated by a shared `DEBUG_KEY` (unset → `404`; wrong key → `403`):
 | `GET /rooms?key=<KEY>` | `{active_rooms, rooms:[{code, member_count, online_count, leader, created_at, last_activity}]}` |
 | `GET /party/<CODE>/debug?key=<KEY>` | full room x-ray (live socket counts, encounters, ghosts) |
 | `GET /rooms/history?key=<KEY>` | `{count, samples:[{ts, active_rooms}]}` — the hourly series |
+| `GET /dashboard?key=<KEY>` | self-contained HTML usage dashboard (open in a browser) — 3 views: adoption-over-time, live-rooms x-ray, feedback inbox |
+| `GET /dashboard.json?key=<KEY>` | `{generated_at, live_rooms, history, feedback}` — what the dashboard page fetches + auto-refreshes |
 
 Base URL: `https://tldps-party.kyle-526.workers.dev`.
+
+**Visual dashboard (the human front door):** open `…/dashboard?key=<KEY>` in a browser. Adoption tab
+charts active-rooms/hour from `hist:` (inline canvas, no CDN) + sums GitHub release `download_count`
+client-side; Live-rooms tab is the `/rooms` x-ray with last-activity **age** surfaced (trust the age,
+not the stale `online_count`); Feedback tab is the `FEEDBACK_KV` inbox (type/message/app_version/screen)
+— this is the read view for the in-app bug/idea/feedback reports. *(Known follow-ups: the chart shows
+`active_rooms` only — `hist:` metadata doesn't carry peak-players yet; the live table's "active boss"
+column is `—` until the room registry summary includes a boss field.)*
 
 ### How it works
 - **`/rooms` registry** — Durable Objects can't be enumerated, so each room writes a `room:<CODE>`
