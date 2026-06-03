@@ -370,7 +370,35 @@
             });
         }
         
+        // === SOUND ===
+        // Self-contained WebAudio beep — no asset-path dependency, works in
+        // packaged offline build (pywebview/WebView2).  Short 80 ms descending
+        // tone: 880 Hz → 440 Hz with a quick fade-out.
+        function playBeepSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); // WebView2 often starts the context suspended
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.13);
+                osc.onended = () => ctx.close();
+            } catch (e) {
+                console.warn('[Sound] playBeepSound failed:', e);
+            }
+        }
+
         function testHotkeySound() {
+            // Test Sound button IS a user gesture — play immediately, no backend
+            // round-trip required.  Also inform the backend (for logging/ack).
+            playBeepSound();
             sendCommand('test_hotkey');
         }
 
@@ -844,6 +872,11 @@
                 }
                 else if (msg.type === 'reset') {
                     // Remote reset triggered (e.g., from hotkey)
+                    // Play audio confirmation if "Play sound on reset" is enabled.
+                    if (document.getElementById('hotkeySound') &&
+                        document.getElementById('hotkeySound').checked) {
+                        playBeepSound();
+                    }
                     // Clear loaded encounter state if active
                     if (isViewingLoadedEncounter) {
                         isViewingLoadedEncounter = false;

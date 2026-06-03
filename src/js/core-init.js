@@ -193,8 +193,15 @@
             if (localStorage.getItem('welcomeModalDismissed') === 'true') {
                 return;
             }
-            
+
             // Show the modal
+            showWelcomeModal();
+        }
+
+        // Explicit re-open (e.g. from Settings).  Clears the "never show again"
+        // The user chose to open it intentionally; showWelcomeModal() has no guard,
+        // so open it now WITHOUT clearing the persistent dismiss flag (auto-show stays off).
+        function showWelcomeModalForce() {
             showWelcomeModal();
         }
 

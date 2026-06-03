@@ -10862,8 +10862,8 @@
                                     <div class="party-setup-mini-steps">
                                         <div class="party-mini-step"><span>1</span> Set your display name</div>
                                         <div class="party-mini-step"><span>2</span> Create or join a party</div>
-                                        <div class="party-mini-step"><span>3</span> Leader starts encounter</div>
-                                        <div class="party-mini-step"><span>4</span> Leader ends to collect results</div>
+                                        <div class="party-mini-step"><span>3</span> Fight a boss — recording starts automatically</div>
+                                        <div class="party-mini-step"><span>4</span> Results post automatically after combat</div>
                                     </div>
                                 </div>
 
@@ -10899,7 +10899,7 @@
                                         <div class="party-action-icon">🔗</div>
                                         <div class="party-action-info">
                                             <h3>Join Party</h3>
-                                            <p>Enter the 4-letter code from your party leader</p>
+                                            <p>Enter the 4-character code from your party leader</p>
                                             <div class="party-join-row">
                                                 <input type="text" id="partyJoinCodeInput" class="party-join-code" placeholder="ABCD" maxlength="4">
                                                 <button class="party-action-btn party-action-btn-join" onclick="joinParty()">Join</button>
@@ -11170,11 +11170,16 @@
                     <span style="font-size:22px;">🔄</span>
                     <div>
                         <div style="font-weight:600;">Check for Updates</div>
-                        <div id="updateStatus" style="font-size:0.75rem; color:#64748b;">Current version v1.0.0</div>
+                        <div id="updateStatus" style="font-size:0.75rem; color:#64748b;">Checking version…</div>
                     </div>
                 </button>
             </div>
-            
+
+            <!-- Welcome Guide re-open -->
+            <div style="border-top: 1px solid #334155; margin: 20px 0; padding-top: 16px;">
+                <button class="btn btn-small" onclick="showWelcomeModalForce(); closeSettings();" style="width:100%; text-align:left; padding:10px 14px;">🏠 Show Welcome Guide</button>
+            </div>
+
             <div class="modal-buttons">
                 <button class="btn" onclick="closeSettings()">Cancel</button>
                 <button class="btn btn-primary" onclick="saveSettings()">Save</button>
@@ -11732,14 +11737,14 @@
                     <div class="accordion-content">
                         <p>Share DPS with your group in real-time using party codes.</p>
                         <p><strong>Set Username</strong> — Choose a display name (required before creating/joining).</p>
-                        <p><strong>Create Party</strong> — Generate a 4-letter code to share with your group.</p>
+                        <p><strong>Create Party</strong> — Generate a 4-character code to share with your group.</p>
                         <p><strong>Join Party</strong> — Enter a party code to join an existing party.</p>
                         <p><strong>Party Features:</strong></p>
                         <table class="guide-table">
                             <tr><td>📊 Live Results</td><td>See everyone's damage updated in real-time</td></tr>
                             <tr><td>🟢 Online Status</td><td>Green/gray dots show who's connected</td></tr>
                             <tr><td>⏱️ Party Expiration</td><td>Parties auto-delete after 12 hours</td></tr>
-                            <tr><td>▶ Start/End</td><td>Leader controls encounter recording</td></tr>
+                            <tr><td>▶ Auto-Record</td><td>Recording starts and ends automatically</td></tr>
                             <tr><td>🎯 Target Filter</td><td>Filter results by specific boss/target</td></tr>
                             <tr><td>🔄 Sync</td><td>Leader can force-refresh all members' data</td></tr>
                             <tr><td>🗑️ Clear Results</td><td>Leader clears results for everyone</td></tr>
@@ -12130,8 +12135,15 @@
             if (localStorage.getItem('welcomeModalDismissed') === 'true') {
                 return;
             }
-            
+
             // Show the modal
+            showWelcomeModal();
+        }
+
+        // Explicit re-open (e.g. from Settings).  Clears the "never show again"
+        // The user chose to open it intentionally; showWelcomeModal() has no guard,
+        // so open it now WITHOUT clearing the persistent dismiss flag (auto-show stays off).
+        function showWelcomeModalForce() {
             showWelcomeModal();
         }
 
@@ -22612,7 +22624,35 @@ ${attemptLine}
             });
         }
         
+        // === SOUND ===
+        // Self-contained WebAudio beep — no asset-path dependency, works in
+        // packaged offline build (pywebview/WebView2).  Short 80 ms descending
+        // tone: 880 Hz → 440 Hz with a quick fade-out.
+        function playBeepSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); // WebView2 often starts the context suspended
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.4, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.13);
+                osc.onended = () => ctx.close();
+            } catch (e) {
+                console.warn('[Sound] playBeepSound failed:', e);
+            }
+        }
+
         function testHotkeySound() {
+            // Test Sound button IS a user gesture — play immediately, no backend
+            // round-trip required.  Also inform the backend (for logging/ack).
+            playBeepSound();
             sendCommand('test_hotkey');
         }
 
@@ -23086,6 +23126,11 @@ ${attemptLine}
                 }
                 else if (msg.type === 'reset') {
                     // Remote reset triggered (e.g., from hotkey)
+                    // Play audio confirmation if "Play sound on reset" is enabled.
+                    if (document.getElementById('hotkeySound') &&
+                        document.getElementById('hotkeySound').checked) {
+                        playBeepSound();
+                    }
                     // Clear loaded encounter state if active
                     if (isViewingLoadedEncounter) {
                         isViewingLoadedEncounter = false;
@@ -26273,6 +26318,8 @@ const PartyRender = {
         // CHECK FOR UPDATES — compare APP_VERSION to latest GitHub release
         // ============================================================
         const APP_VERSION = '1.0.3';
+        // Set the displayed current-version from APP_VERSION so the static placeholder never goes stale.
+        (function() { const _us = document.getElementById('updateStatus'); if (_us) _us.textContent = 'Current version v' + APP_VERSION; })();
         const RELEASES_LATEST_API = 'https://api.github.com/repos/stoopkid713/TL-DPS-Meter/releases/latest';
         const RELEASES_PAGE = 'https://github.com/stoopkid713/TL-DPS-Meter/releases/latest';
         function _verTuple(v) { return String(v || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0); }
