@@ -307,7 +307,7 @@
                     partyWSWantOpen = false;
                     alert('Could not join party. It may be full, the code may be invalid, or the server is unreachable.');
                     partyState.connected = false;
-                    { const _prev = partyState.party_code; partyState.party_code = null; if (_prev !== null) partyDebug('party_code_change', { event: 'party_code_change', from: _prev, to: null, reason: 'disconnect' }); }
+                    { const _prev = partyState.party_code; partyState.party_code = null; if (_prev !== null) partyDebug('party_code_change', { from: _prev, to: null, reason: 'disconnect' }); }
                     partyState.is_leader = false; partyState.encounter_active = false;
                     updatePartyUI();
                     return;
@@ -417,7 +417,7 @@
                         partyWSWantOpen = false;
                         disconnectPartyWS();
                         partyState.connected = false;
-                        { const _prev = partyState.party_code; partyState.party_code = null; if (_prev !== null) partyDebug('party_code_change', { event: 'party_code_change', from: _prev, to: null, reason: 'kicked' }); }
+                        { const _prev = partyState.party_code; partyState.party_code = null; if (_prev !== null) partyDebug('party_code_change', { from: _prev, to: null, reason: 'kicked' }); }
                         partyState.is_leader = false;
                         partyState.roster = [];
                         updatePartyUI();
@@ -604,7 +604,7 @@
             _authCodeTs = Date.now();
 
             partyState.connected = true;
-            { const _prev = partyState.party_code; partyState.party_code = code; if (_prev !== code) partyDebug('party_code_change', { event: 'party_code_change', from: _prev, to: code, reason: 'createParty' }); }
+            { const _prev = partyState.party_code; partyState.party_code = code; if (_prev !== code) partyDebug('party_code_change', { from: _prev, to: code, reason: 'createParty' }); }
             partyState.is_leader = true;
             partyState.created_at = new Date().toISOString();
             partyState.encounter_active = false;
@@ -677,7 +677,7 @@
             _authCodeTs = Date.now();
 
             partyState.connected = true;
-            { const _prev = partyState.party_code; partyState.party_code = code; if (_prev !== code) partyDebug('party_code_change', { event: 'party_code_change', from: _prev, to: code, reason: 'joinParty' }); }
+            { const _prev = partyState.party_code; partyState.party_code = code; if (_prev !== code) partyDebug('party_code_change', { from: _prev, to: code, reason: 'joinParty' }); }
             partyState.is_leader = false;  // the room's welcome confirms our role
             partyState.created_at = new Date().toISOString();
             partyState.encounter_active = false;
@@ -790,7 +790,7 @@
             disconnectPartyWS();
 
             partyState.connected = false;
-            { const _prev = partyState.party_code; partyState.party_code = null; if (_prev !== null) partyDebug('party_code_change', { event: 'party_code_change', from: _prev, to: null, reason: 'leave' }); }
+            { const _prev = partyState.party_code; partyState.party_code = null; if (_prev !== null) partyDebug('party_code_change', { from: _prev, to: null, reason: 'leave' }); }
             partyState.is_leader = false;
             partyState.encounter_active = false;
             partyState.results = {};
@@ -1333,7 +1333,7 @@
                         age_ms: Date.now() - _authCodeTs
                     });
                 } else {
-                    const _prev = partyState.party_code; partyState.party_code = status.party_code; if (_prev !== status.party_code) partyDebug('party_code_change', { event: 'party_code_change', from: _prev, to: status.party_code, reason: 'status_sync', wsUrl: partyWS ? partyWS.url : undefined });
+                    const _prev = partyState.party_code; partyState.party_code = status.party_code; if (_prev !== status.party_code) partyDebug('party_code_change', { from: _prev, to: status.party_code, reason: 'status_sync', wsUrl: partyWS ? partyWS.url : undefined });
                 }
             }
             if (status.is_leader !== undefined && status.is_leader !== null) {
