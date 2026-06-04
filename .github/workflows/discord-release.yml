@@ -1,0 +1,22 @@
+﻿name: Discord Release Embed
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post release embed to Discord #changelog
+        uses: SethCohen/github-releases-to-discord@v1.15.1
+        with:
+          webhook_url: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          color: "3066993"
+          username: "STOOP DPS Meter"
+          avatar_url: "https://stoopkid713.github.io/TL-DPS-Meter/img/og-card.jpg"
+          content: "<@&1512154464377638963> New STOOP release is out!"
+          footer_title: "STOOP DPS Meter"
+          footer_icon_url: "https://stoopkid713.github.io/TL-DPS-Meter/img/og-card.jpg"
+          footer_timestamp: true
+          reduce_headings: true
