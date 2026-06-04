@@ -1,0 +1,51 @@
+name: CI
+
+# Wires the EXISTING test suite into a push/PR gate so an agent lane's break is
+# caught automatically instead of in the owner's hands-on pass. Pure-Python +
+# JS-syntax checks run on ubuntu (fast/cheap); the parity tests self-skip when the
+# gitignored gold_* fixtures are absent (expected). The Windows PyInstaller build
+# gate is a deliberate follow-up (needs a windows runner) — see PUNCHLIST.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-tests:
+    name: pytest (backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: pytest — unit suite (parity tests skip without gold_* fixtures)
+        working-directory: backend
+        run: uv run --no-progress pytest -q
+
+  js-syntax:
+    name: node --check (frontend modules)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax-check all inlined JS modules
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          fail=0
+          for f in src/js/*.js party_render.js overlay/src/*.js; do
+            [ -f "$f" ] || continue
+            echo "checking $f"
+            node --check "$f" || fail=1
+          done
+          exit $fail
