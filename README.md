@@ -63,9 +63,9 @@ Turn everyone's combat logs into **one shared boss scoreboard** — no more comp
 screenshots after a run. Each person runs the app and joins the same party; every
 boss kill produces a single ranked board with everyone on it.
 
-![The board fills the moment combat ends — every member ranked by damage.](https://stoopkid713.github.io/TL-DPS-Meter/img/reveal.gif)
+![The board fills the moment combat ends — every member ranked by damage.](https://stoopkid713.github.io/STOOP/img/reveal.gif)
 
-![Click any teammate for their full per-skill breakdown and rotation.](https://stoopkid713.github.io/TL-DPS-Meter/img/drilldown.gif)
+![Click any teammate for their full per-skill breakdown and rotation.](https://stoopkid713.github.io/STOOP/img/drilldown.gif)
 
 - **One merged board per boss.** Each kill = a ranked scoreboard with every
   member's damage, **contribution %**, DPS, hits, and crit / heavy rates.
