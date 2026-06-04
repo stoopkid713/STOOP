@@ -5,6 +5,15 @@ All notable changes are documented here. Format loosely based on
 
 ---
 
+## [1.1.1] - 2026-06-03
+
+### Changed
+- **Repo renamed to STOOP** — GitHub repo is now `stoopkid713/STOOP`.
+  - In-app update checker and release links now point to the new URL.
+  - Installer `AppURL` updated to `github.com/stoopkid713/STOOP`.
+
+---
+
 ## [1.1.0] - 2026-06-03
 
 ### Changed

@@ -510,11 +510,11 @@
         // ============================================================
         // CHECK FOR UPDATES — compare APP_VERSION to latest GitHub release
         // ============================================================
-        const APP_VERSION = '1.1.0';
+        const APP_VERSION = '1.1.1';
         // Set the displayed current-version from APP_VERSION so the static placeholder never goes stale.
         (function() { const _us = document.getElementById('updateStatus'); if (_us) _us.textContent = 'Current version v' + APP_VERSION; })();
-        const RELEASES_LATEST_API = 'https://api.github.com/repos/stoopkid713/TL-DPS-Meter/releases/latest';
-        const RELEASES_PAGE = 'https://github.com/stoopkid713/TL-DPS-Meter/releases/latest';
+        const RELEASES_LATEST_API = 'https://api.github.com/repos/stoopkid713/STOOP/releases/latest';
+        const RELEASES_PAGE = 'https://github.com/stoopkid713/STOOP/releases/latest';
         function _verTuple(v) { return String(v || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0); }
         function _verGt(a, b) {
             const x = _verTuple(a), y = _verTuple(b);
