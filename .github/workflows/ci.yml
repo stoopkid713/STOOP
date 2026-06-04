@@ -19,8 +19,11 @@ concurrency:
 
 jobs:
   python-tests:
+    # windows-latest, not ubuntu: STOOP is a Windows-only app (PyInstaller exe +
+    # WebView2). Test on the platform it ships for — some parser/time behavior
+    # differs on Linux in ways that never affect a real (Windows) user.
     name: pytest (backend)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
