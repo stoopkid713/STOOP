@@ -1,75 +1,115 @@
-"""Generate the app icon (assets/icon.ico) from the ツCKヤ DPS Meter branding.
+"""Generate all STOOP brand icons from the Night & Brick + palette.
 
-A dark rounded tile with a pink->cyan "CK" monogram (the app's brand colors).
-Regenerate with:  uv run python assets/make_icon.py
-Outputs a multi-resolution .ico (16/24/32/48/64/128/256) next to this script.
+Three ascending bars — stoop steps + bar chart ascending.
+Left: dark brick  ·  Centre: brick #D96444  ·  Right: amber #F0B845
+Background: midnight navy #080C14 with rounded corners.
+
+Outputs:
+  assets/icon.ico              — main app icon (16/24/32/48/64/128/256)
+  assets/icon-512.png          — master PNG (for reference / future use)
+  ../../overlay/src-tauri/icons/icon.png        — Tauri master (512x512)
+  ../../overlay/src-tauri/icons/icon.ico        — Tauri ICO
+  ../../overlay/src-tauri/icons/128x128.png
+  ../../overlay/src-tauri/icons/128x128@2x.png  (256x256)
+  ../../overlay/src-tauri/icons/32x32.png
+
+Regenerate:  uv run python assets/make_icon.py
 """
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 HERE = Path(__file__).resolve().parent
-S = 256  # master size; .ico downscales to the standard sizes
-RADIUS = 52
+OVERLAY_ICONS = HERE / "../../overlay/src-tauri/icons"
 
-BG_TOP = (30, 41, 59)     # slate-800
-BG_BOT = (8, 14, 26)      # near-black navy
-PINK = (236, 72, 153)     # brand pink
-CYAN = (56, 189, 248)     # brand cyan
-
-
-def _font(size: int) -> ImageFont.FreeTypeFont:
-    for name in ("segoeuib.ttf", "arialbd.ttf", "seguisb.ttf", "Arial.ttf"):
-        try:
-            return ImageFont.truetype(name, size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
+# ── Palette ────────────────────────────────────────────────────────────────
+BG       = (8,   12,  20)   # #080C14  midnight navy
+BAR_DIM  = (107, 61,  40)   # #6B3D28  dark brick (left/shortest bar)
+BAR_MID  = (217, 100, 68)   # #D96444  brick+     (centre bar)
+BAR_TALL = (240, 184, 69)   # #F0B845  amber+     (right/tallest bar)
 
 
-def _vertical_gradient(w: int, h: int, top, bot) -> Image.Image:
-    grad = Image.new("RGB", (w, h))
-    px = grad.load()
-    for y in range(h):
-        t = y / max(h - 1, 1)
-        col = tuple(round(top[i] + (bot[i] - top[i]) * t) for i in range(3))
-        for x in range(w):
-            px[x, y] = col
-    return grad
+def render(size: int) -> Image.Image:
+    """Render the STOOP three-bars mark at *size* × *size* pixels."""
+    S = size
+    radius = max(2, round(S * 0.20))  # ~20% corner radius, min 2px
+
+    # ── Background tile ────────────────────────────────────────────────────
+    img  = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.rounded_rectangle([0, 0, S - 1, S - 1], radius=radius, fill=(*BG, 255))
+
+    # ── Three ascending bars ───────────────────────────────────────────────
+    # Proportions are designed to look good from 16 px to 512 px.
+    #
+    #   padding:  14% of S on each side horizontally, 18% at bottom
+    #   bar_w:    each bar is 18% of S wide
+    #   gap:      4% of S between bars
+    #   heights:  left=30%, centre=50%, right=70% of S
+    #   top_r:    2% rounded tops on each bar
+
+    pad_x   = round(S * 0.14)
+    pad_bot = round(S * 0.18)
+    bar_w   = round(S * 0.18)
+    gap     = round(S * 0.04)
+    top_r   = max(1, round(S * 0.025))
+
+    total_w = bar_w * 3 + gap * 2
+    left    = (S - total_w) // 2
+    base_y  = S - pad_bot
+
+    bars = [
+        (BAR_DIM,  round(S * 0.30)),
+        (BAR_MID,  round(S * 0.50)),
+        (BAR_TALL, round(S * 0.70)),
+    ]
+
+    for i, (colour, h) in enumerate(bars):
+        x0 = left + i * (bar_w + gap)
+        x1 = x0 + bar_w - 1
+        y0 = base_y - h
+        y1 = base_y
+        draw.rounded_rectangle([x0, y0, x1, y1], radius=top_r, fill=(*colour, 255))
+
+    return img
+
+
+def _save_png(img: Image.Image, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(path, format="PNG")
+    print(f"  PNG  {path}  ({img.size[0]}×{img.size[1]})")
+
+
+def _save_ico(sizes: list[int], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    images = [render(s) for s in sizes]
+    images[0].save(
+        path, format="ICO",
+        sizes=[(s, s) for s in sizes],
+        append_images=images[1:],
+    )
+    print(f"  ICO  {path}  (sizes {sizes})")
 
 
 def main() -> None:
-    # rounded-tile background with a vertical gradient
-    bg = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    grad = _vertical_gradient(S, S, BG_TOP, BG_BOT).convert("RGBA")
-    mask = Image.new("L", (S, S), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=RADIUS, fill=255)
-    bg.paste(grad, (0, 0), mask)
+    print("STOOP icon generator — Night & Brick + palette")
 
-    # "CK" monogram, sized to fit, filled with a horizontal pink->cyan gradient
-    font = _font(150)
-    text = "CK"
-    tmask = Image.new("L", (S, S), 0)
-    td = ImageDraw.Draw(tmask)
-    bbox = td.textbbox((0, 0), text, font=font, stroke_width=0)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    tx = (S - tw) / 2 - bbox[0]
-    ty = (S - th) / 2 - bbox[1]
-    td.text((tx, ty), text, fill=255, font=font)
+    # ── App icon (installer + desktop shortcut) ────────────────────────────
+    ico_sizes = [16, 24, 32, 48, 64, 128, 256]
+    _save_ico(ico_sizes, HERE / "icon.ico")
+    _save_png(render(512), HERE / "icon-512.png")
 
-    tgrad = Image.new("RGB", (S, S))
-    tpx = tgrad.load()
-    for x in range(S):
-        t = x / (S - 1)
-        col = tuple(round(PINK[i] + (CYAN[i] - PINK[i]) * t) for i in range(3))
-        for y in range(S):
-            tpx[x, y] = col
-    bg.paste(tgrad, (0, 0), tmask)
+    # ── Overlay / Tauri icons ──────────────────────────────────────────────
+    if OVERLAY_ICONS.is_dir():
+        _save_ico(ico_sizes, OVERLAY_ICONS / "icon.ico")
+        _save_png(render(512), OVERLAY_ICONS / "icon.png")
+        _save_png(render(128), OVERLAY_ICONS / "128x128.png")
+        _save_png(render(256), OVERLAY_ICONS / "128x128@2x.png")
+        _save_png(render(32),  OVERLAY_ICONS / "32x32.png")
+    else:
+        print(f"  (overlay icons dir not found — skipping: {OVERLAY_ICONS})")
 
-    sizes = [16, 24, 32, 48, 64, 128, 256]
-    out = HERE / "icon.ico"
-    bg.save(out, format="ICO", sizes=[(s, s) for s in sizes])
-    print(f"wrote {out} ({out.stat().st_size} bytes; sizes {sizes})")
+    print("Done.")
 
 
 if __name__ == "__main__":
