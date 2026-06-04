@@ -35,18 +35,18 @@ Two ways to get it — pick one:
 
 | | **Installer** | **Portable** |
 |---|---|---|
-| File | `TL-DPS-Meter-Setup.exe` | `TL-DPS-Meter-portable.zip` |
+| File | `STOOP-Setup.exe` | `STOOP-portable.zip` |
 | Installs to | `%LOCALAPPDATA%\Programs` (per-user, no admin) | nowhere — runs from the folder |
 | Start Menu / uninstaller | yes | no |
 | Your data lives | `%LOCALAPPDATA%\TL-DPS-Meter` | **next to the exe** (USB-movable) |
 | Best for | "set it and forget it" | a portable / USB setup, or trying it out |
 
-- **[⬇ Download the Installer — `TL-DPS-Meter-Setup.exe`](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest/download/TL-DPS-Meter-Setup.exe)**
+- **[⬇ Download the Installer — `STOOP-Setup.exe`](https://github.com/stoopkid713/STOOP/releases/latest/download/STOOP-Setup.exe)**
   — run it, then launch from the Start Menu.
-- **[⬇ Download the Portable zip — `TL-DPS-Meter-portable.zip`](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest/download/TL-DPS-Meter-portable.zip)**
-  — unzip anywhere (keep the files together), double-click `TL-DPS-Meter.exe`. The app *is* the window — no browser tab.
+- **[⬇ Download the Portable zip — `STOOP-portable.zip`](https://github.com/stoopkid713/STOOP/releases/latest/download/STOOP-portable.zip)**
+  — unzip anywhere (keep the files together), double-click `STOOP.exe`. The app *is* the window — no browser tab.
 
-*(Or browse [all releases](https://github.com/stoopkid713/TL-DPS-Meter/releases/latest).)*
+*(Or browse [all releases](https://github.com/stoopkid713/STOOP/releases/latest).)*
 
 **Windows 10/11.** First launch shows a SmartScreen "unknown publisher" warning
 (unsigned build) — click **More info → Run anyway**.
@@ -146,7 +146,7 @@ The app is Python + a single-file HTML frontend, packaged with PyInstaller.
 ```powershell
 cd backend
 uv run pytest                 # run the test suite
-uv run python build.py        # -> dist/TL-DPS-Meter.exe + portable.zip + Setup.exe
+uv run python build.py        # -> dist/STOOP.exe + portable.zip + Setup.exe
 ```
 
 `build.py --no-installer` skips the Inno Setup step. The installer needs

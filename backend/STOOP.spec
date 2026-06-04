@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec for TL-DPS-Meter (rebuild backend, Phase 8).
+"""PyInstaller spec for STOOP (rebuild backend, Phase 8).
 
 Windowed (``console=False``) single-file GUI build — double-click to launch, no
 terminal window (matches the old exe). Bundles the frontend ``index.html`` as a
@@ -7,8 +7,8 @@ read-only ``datas`` asset (loaded from ``sys._MEIPASS`` at runtime via
 ``main.resolve_index_html``); the writable JSON state lives NEXT TO the exe (see
 ``main.app_dir`` / ``main.resolve_data_dir``).
 
-Build (from backend/):  uv run pyinstaller TL-DPS-Meter.spec --noconfirm
-Output:                 backend/dist/TL-DPS-Meter.exe
+Build (from backend/):  uv run pyinstaller STOOP.spec --noconfirm
+Output:                 backend/dist/STOOP.exe
 
 The repo-root TL-DPS-Meter.exe (the parity oracle) is never touched — output
 goes to backend/dist/.
@@ -63,7 +63,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="TL-DPS-Meter",
+    name="STOOP",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

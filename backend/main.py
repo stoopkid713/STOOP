@@ -53,14 +53,21 @@ log = logging.getLogger("tldps.main")
 
 
 # --- packaging-aware path resolution ---------------------------------------
-APP_NAME = "TL-DPS-Meter"
+APP_NAME = "STOOP"
+# Pre-1.1.2 data-dir name. Existing installs kept their writable state under
+# %LOCALAPPDATA%\TL-DPS-Meter; on first launch of a STOOP-named build we move it
+# to %LOCALAPPDATA%\STOOP so the rebrand doesn't orphan saved runs/settings.
+LEGACY_APP_NAME = "TL-DPS-Meter"
 
 # Sentinel that distinguishes the two production packages. Both ship the SAME
 # onefile exe; the PORTABLE zip ALSO ships this empty marker next to the exe, the
 # installer does not. Its presence flips data + log storage from the per-user
 # %LOCALAPPDATA% dir (installed convention) to NEXT TO THE EXE (old-style, fully
 # portable — the whole folder travels on a USB stick).
-PORTABLE_MARKER = "TL-DPS-Meter.portable"
+PORTABLE_MARKER = "STOOP.portable"
+# Honor the old marker too, so a portable folder from a pre-1.1.2 build (or an
+# exe swapped into an old portable folder) still resolves as portable.
+LEGACY_PORTABLE_MARKER = "TL-DPS-Meter.portable"
 
 
 def _is_frozen() -> bool:
@@ -72,7 +79,30 @@ def _is_portable() -> bool:
     """True when the frozen build is the PORTABLE package (marker next to the exe)."""
     if not _is_frozen():
         return False
-    return (Path(sys.executable).resolve().parent / PORTABLE_MARKER).is_file()
+    parent = Path(sys.executable).resolve().parent
+    return (parent / PORTABLE_MARKER).is_file() or (parent / LEGACY_PORTABLE_MARKER).is_file()
+
+
+def _migrate_legacy_app_dir(base: str, new_dir: Path) -> None:
+    """One-time move of the pre-1.1.2 ``%LOCALAPPDATA%\\TL-DPS-Meter`` data dir to the
+    STOOP name, so the rebrand keeps existing users' saved runs/settings/log.
+
+    Best-effort: only runs when the new dir doesn't exist yet, and NEVER raises — a
+    failed migration must not block launch (the caller then makes a fresh dir).
+    """
+    if new_dir.exists():
+        return
+    legacy = Path(base) / LEGACY_APP_NAME
+    if not legacy.is_dir():
+        return
+    try:
+        os.rename(legacy, new_dir)
+    except OSError:
+        try:
+            import shutil
+            shutil.move(str(legacy), str(new_dir))
+        except Exception:
+            pass
 
 
 def app_dir() -> Path:
@@ -95,6 +125,7 @@ def app_dir() -> Path:
             return Path(sys.executable).resolve().parent
         base = os.environ.get("LOCALAPPDATA") or str(Path.home())
         d = Path(base) / APP_NAME
+        _migrate_legacy_app_dir(base, d)
         d.mkdir(parents=True, exist_ok=True)
         return d
     return Path(__file__).resolve().parent.parent

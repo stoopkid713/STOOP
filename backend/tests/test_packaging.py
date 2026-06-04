@@ -40,6 +40,46 @@ def test_frozen_data_dir_is_localappdata_not_meipass_or_exe(monkeypatch, tmp_pat
     assert main_mod.resolve_data_dir() != exe.parent
 
 
+def test_migrates_legacy_app_dir(monkeypatch, tmp_path):
+    """Rebrand safety: an existing %LOCALAPPDATA%\\TL-DPS-Meter data dir is moved to
+    the STOOP name on first launch, so saved runs/settings are NOT orphaned."""
+    exe = tmp_path / "Programs" / "STOOP" / "STOOP.exe"
+    meipass = tmp_path / "_MEI"
+    local = tmp_path / "LocalAppData"
+    _freeze(monkeypatch, exe, meipass)
+    monkeypatch.delenv("TLDPS_DATA_DIR", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+
+    # seed a pre-1.1.2 data dir with a user file
+    legacy = local / main_mod.LEGACY_APP_NAME
+    legacy.mkdir(parents=True)
+    (legacy / "saved_runs.json").write_text("USER DATA", encoding="utf-8")
+
+    new_dir = main_mod.app_dir()
+    assert new_dir == local / main_mod.APP_NAME            # now resolves to STOOP
+    assert (new_dir / "saved_runs.json").read_text(encoding="utf-8") == "USER DATA"
+    assert not legacy.exists()                             # old dir moved, not copied
+
+
+def test_legacy_migration_skipped_when_new_dir_exists(monkeypatch, tmp_path):
+    """If a STOOP dir already exists, the legacy dir is left untouched (no clobber)."""
+    exe = tmp_path / "Programs" / "STOOP" / "STOOP.exe"
+    local = tmp_path / "LocalAppData"
+    _freeze(monkeypatch, exe, tmp_path / "_MEI")
+    monkeypatch.delenv("TLDPS_DATA_DIR", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+
+    (local / main_mod.APP_NAME).mkdir(parents=True)
+    (local / main_mod.APP_NAME / "keep.json").write_text("NEW", encoding="utf-8")
+    legacy = local / main_mod.LEGACY_APP_NAME
+    legacy.mkdir(parents=True)
+    (legacy / "old.json").write_text("OLD", encoding="utf-8")
+
+    main_mod.app_dir()
+    assert (local / main_mod.APP_NAME / "keep.json").read_text(encoding="utf-8") == "NEW"
+    assert legacy.exists()  # untouched
+
+
 def test_frozen_index_html_is_meipass(monkeypatch, tmp_path):
     exe = tmp_path / "dist" / "TL-DPS-Meter.exe"
     meipass = tmp_path / "_MEI12345"

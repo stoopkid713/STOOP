@@ -1,22 +1,22 @@
 #!/usr/bin/env python
-"""Build the windowed TL-DPS-Meter exe + installer.
+"""Build the windowed STOOP exe + installer.
 
 Run from backend/:  uv run python build.py [--no-installer]
-Outputs:            backend/dist/TL-DPS-Meter.exe
-                    backend/dist/TL-DPS-Meter-portable.zip          (exe + portable marker)
-                    backend/dist/TL-DPS-Meter-Setup.exe             (if Inno Setup is present)
+Outputs:            backend/dist/STOOP.exe
+                    backend/dist/STOOP-portable.zip          (exe + portable marker)
+                    backend/dist/STOOP-Setup.exe             (if Inno Setup is present)
 
 The two production packages share ONE onefile exe. The portable zip also ships an
-empty ``TL-DPS-Meter.portable`` marker next to the exe; main.app_dir() sees it and
+empty ``STOOP.portable`` marker next to the exe; main.app_dir() sees it and
 keeps JSON state + log beside the exe (USB-movable). The installer omits the marker,
 so the installed app stores state under %LOCALAPPDATA%.
 
 The OLD repo-root TL-DPS-Meter.exe (the parity oracle) is NEVER touched — this only
 writes under backend/dist/ and backend/build/. The previous exe is kept as
-dist/TL-DPS-Meter.prev.exe for rollback (N-1).
+dist/STOOP.prev.exe for rollback (N-1).
 
 Installed app data: the frozen exe reads/writes its JSON state + rotating log under
-%LOCALAPPDATA%\\TL-DPS-Meter (see main.app_dir), so it works even when installed to
+%LOCALAPPDATA%\\STOOP (see main.app_dir), so it works even when installed to
 a read-only location (the per-user installer puts it in %LOCALAPPDATA%\\Programs).
 
 Signing is intentionally skipped for now: an Authenticode/EV cert (~$100-400/yr)
@@ -35,15 +35,15 @@ from pathlib import Path
 from typing import Optional
 
 HERE = Path(__file__).resolve().parent
-SPEC = HERE / "TL-DPS-Meter.spec"
-ISS = HERE / "installer" / "TL-DPS-Meter.iss"
+SPEC = HERE / "STOOP.spec"
+ISS = HERE / "installer" / "STOOP.iss"
 DIST = HERE / "dist"
 BUILD = HERE / "build"
-EXE = DIST / "TL-DPS-Meter.exe"
-PREV = DIST / "TL-DPS-Meter.prev.exe"
-SETUP = DIST / "TL-DPS-Meter-Setup.exe"
-PORTABLE_ZIP = DIST / "TL-DPS-Meter-portable.zip"
-PORTABLE_MARKER = "TL-DPS-Meter.portable"  # must match main.PORTABLE_MARKER
+EXE = DIST / "STOOP.exe"
+PREV = DIST / "STOOP.prev.exe"
+SETUP = DIST / "STOOP-Setup.exe"
+PORTABLE_ZIP = DIST / "STOOP-portable.zip"
+PORTABLE_MARKER = "STOOP.portable"  # must match main.PORTABLE_MARKER
 HOWTO = HERE.parent / "HOW-TO-USE.txt"
 OVERLAY_DIR = HERE.parent / "overlay" / "src-tauri"  # Tauri party overlay (Rust)
 

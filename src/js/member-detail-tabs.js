@@ -510,7 +510,7 @@
         // ============================================================
         // CHECK FOR UPDATES — compare APP_VERSION to latest GitHub release
         // ============================================================
-        const APP_VERSION = '1.1.1';
+        const APP_VERSION = '1.1.2';
         // Set the displayed current-version from APP_VERSION so the static placeholder never goes stale.
         (function() { const _us = document.getElementById('updateStatus'); if (_us) _us.textContent = 'Current version v' + APP_VERSION; })();
         const RELEASES_LATEST_API = 'https://api.github.com/repos/stoopkid713/STOOP/releases/latest';

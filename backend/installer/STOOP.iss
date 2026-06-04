@@ -1,14 +1,14 @@
 ; Inno Setup script for STOOP — per-user install (no admin/UAC).
 ; Built by build.py via ISCC; paths are relative to this file (backend/installer/).
 ; Per-user install to %LOCALAPPDATA%\Programs; the app keeps its writable state in
-; %LOCALAPPDATA%\TL-DPS-Meter (see main.app_dir), so it never writes under a
+; %LOCALAPPDATA%\STOOP (see main.app_dir), so it never writes under a
 ; read-only install dir.
 
 #define MyAppName "STOOP"
-#define MyAppVersion "1.1.1"
+#define MyAppVersion "1.1.2"
 #define MyAppPublisher "OhStoopKid"
 #define MyAppURL "https://github.com/stoopkid713/STOOP"
-#define MyAppExeName "TL-DPS-Meter.exe"
+#define MyAppExeName "STOOP.exe"
 
 [Setup]
 ; Stable AppId — keep constant across versions so upgrades/uninstall track correctly.
@@ -18,13 +18,13 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
-DefaultDirName={localappdata}\Programs\TL-DPS-Meter
+DefaultDirName={localappdata}\Programs\STOOP
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\dist
-OutputBaseFilename=TL-DPS-Meter-Setup
+OutputBaseFilename=STOOP-Setup
 SetupIconFile=..\assets\icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardStyle=modern
@@ -38,6 +38,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"
+
+[InstallDelete]
+; Pre-1.1.2 installs shipped TL-DPS-Meter.exe in the program dir; the rename to
+; STOOP.exe leaves it orphaned on upgrade. Remove it (shortcuts are recreated to
+; the new exe by [Icons]). Same AppId => upgrades land in the existing dir.
+Type: files; Name: "{app}\TL-DPS-Meter.exe"
 
 [Files]
 Source: "..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
@@ -112,7 +118,7 @@ begin
 end;
 
 // On uninstall, offer to also remove the per-user data folder
-// (%LOCALAPPDATA%\TL-DPS-Meter: saved encounters, runs, settings, log).
+// (%LOCALAPPDATA%\STOOP: saved encounters, runs, settings, log).
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;
@@ -122,7 +128,7 @@ begin
   // leaves user data in place (the safe default).
   if (CurUninstallStep = usUninstall) and (not UninstallSilent) then
   begin
-    DataDir := ExpandConstant('{localappdata}\TL-DPS-Meter');
+    DataDir := ExpandConstant('{localappdata}\STOOP');
     if DirExists(DataDir) then
     begin
       if MsgBox('Also remove your saved data (encounters, runs, settings)?'#13#10#13#10

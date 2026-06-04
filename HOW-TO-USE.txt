@@ -2,7 +2,7 @@
 =============================
 
 Quick Start:
-1. Double-click TL-DPS-Meter.exe
+1. Double-click STOOP.exe
 2. A native window opens — that window IS the meter (no browser tab)
 3. Play TL with combat logging enabled
 4. Press Ctrl+Tab anytime to reset encounter (works in-game)
@@ -48,7 +48,7 @@ Global Hotkey:
 - Change in Settings if needed
 
 Troubleshooting:
-- "Disconnected" in the window → make sure TL-DPS-Meter.exe is running
+- "Disconnected" in the window → make sure STOOP.exe is running
 - No data → combat logging must be enabled in-game
 - Hotkey conflict → change it in Settings
 - Stats appear blank mid-fight → normal, TL writes logs after combat ends

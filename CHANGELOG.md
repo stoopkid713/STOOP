@@ -5,6 +5,21 @@ All notable changes are documented here. Format loosely based on
 
 ---
 
+## [1.1.2] - 2026-06-03
+
+### Changed
+- **Downloads are now named STOOP** — `STOOP-Setup.exe`, `STOOP.exe`, and
+  `STOOP-portable.zip` (were `TL-DPS-Meter-*`). The installed program, Start-menu
+  entry, and the exe's file properties now read STOOP throughout.
+- Installs to `…\Programs\STOOP`; data lives in `%LOCALAPPDATA%\STOOP`.
+
+### Fixed
+- **Your saved data carries over** — on first launch the app automatically moves an
+  existing `%LOCALAPPDATA%\TL-DPS-Meter` folder (saved runs, settings, history) to the
+  new STOOP location, so the rename loses nothing. Upgrades also remove the old exe.
+
+---
+
 ## [1.1.1] - 2026-06-03
 
 ### Fixed
