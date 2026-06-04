@@ -7,10 +7,19 @@ All notable changes are documented here. Format loosely based on
 
 ## [1.1.1] - 2026-06-03
 
+### Fixed
+- **Invite links were dead** — the in-app "Copy Invite Link" pointed at the old
+  `…/TL-DPS-Meter/join.html` URL, which 404s now that the site lives at `…/STOOP/`.
+  Invite links work again.
+
 ### Changed
-- **Repo renamed to STOOP** — GitHub repo is now `stoopkid713/STOOP`.
-  - In-app update checker and release links now point to the new URL.
-  - Installer `AppURL` updated to `github.com/stoopkid713/STOOP`.
+- **Lighter, easier-on-the-eyes palette** — the dark navy skeleton was retoned
+  brighter (Night & Brick + at "L3" lightness) so cards, borders, and panels read
+  clearly without washing out the brick/sky/amber accents.
+- **Repo renamed to STOOP** — GitHub repo is now `stoopkid713/STOOP`; the in-app
+  update checker, release links, and installer `AppURL` point to the new URL.
+- Welcome guide title and a few stray bits of old branding cleaned up
+  (“Welcome to STOOP”, GitHub link, About/credits wording).
 
 ---
 
