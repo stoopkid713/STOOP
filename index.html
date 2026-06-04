@@ -1,37 +1,40 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TL-DPS-Meter — Party DPS for Throne and Liberty (free &amp; open-source)</title>
+<title>STOOP — Party DPS for Throne and Liberty (free &amp; open-source)</title>
 <meta name="description" content="A free, open-source DPS meter for Throne and Liberty. See your whole party's damage on one shared boss scoreboard — with per-skill drill-down, rotation timelines, head-to-head compare, and an in-game overlay. Reads the game's combat logs; never touches the game.">
 <link rel="canonical" href="https://stoopkid713.github.io/TL-DPS-Meter/">
 
 <!-- Open Graph / Twitter -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="TL-DPS-Meter — Party DPS for Throne and Liberty">
+<meta property="og:title" content="STOOP — Party DPS for Throne and Liberty">
 <meta property="og:description" content="A live, shared boss scoreboard for your whole party — free, open-source, no setup. Per-skill drill-down, rotation timelines, compare, and an in-game overlay.">
 <meta property="og:url" content="https://stoopkid713.github.io/TL-DPS-Meter/">
 <meta property="og:image" content="https://stoopkid713.github.io/TL-DPS-Meter/img/og-card.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="TL-DPS-Meter — Party DPS for Throne and Liberty">
+<meta name="twitter:title" content="STOOP — Party DPS for Throne and Liberty">
 <meta name="twitter:description" content="A live, shared boss scoreboard for your whole party — free, open-source, no setup.">
 <meta name="twitter:image" content="https://stoopkid713.github.io/TL-DPS-Meter/img/og-card.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 
 <style>
 :root{
-  --bg1:#1a1a2e; --bg2:#16213e; --panel:rgba(0,0,0,.22); --panel2:rgba(255,255,255,.03);
-  --ink:#e2e8f0; --dim:#94a3b8; --faint:#64748b; --cyan:#22d3ee; --cyan-d:#0e7490;
-  --line:rgba(148,163,184,.16); --glow:rgba(34,211,238,.5);
+  --bg1:#080C14; --bg2:#090E1A; --panel:rgba(0,0,0,.22); --panel2:rgba(255,255,255,.03);
+  --ink:#e2e8f0; --dim:#94a3b8; --faint:#64748b; --cyan:#D96444; --cyan-d:#B5492E;
+  --line:rgba(148,163,184,.16); --glow:rgba(217,100,68,.5);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
   font-family:"Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink);margin:0;
   background:var(--bg2);line-height:1.6;
-  background-image:radial-gradient(1200px 600px at 70% -10%,rgba(34,211,238,.10),transparent 60%),linear-gradient(135deg,var(--bg1),var(--bg2));
+  background-image:radial-gradient(1200px 600px at 70% -10%,rgba(217,100,68,.10),transparent 60%),linear-gradient(135deg,var(--bg1),var(--bg2));
   background-attachment:fixed;
 }
 a{color:var(--cyan);text-decoration:none}
@@ -43,8 +46,7 @@ img{max-width:100%;height:auto;display:block}
 header{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
   background:rgba(15,17,32,.62);border-bottom:1px solid var(--line)}
 .nav{display:flex;align-items:center;gap:16px;height:60px}
-.brand{font-weight:800;letter-spacing:.02em;font-size:1.05rem;color:var(--ink)}
-.brand .ck{color:var(--cyan)}
+.brand{font-family:'Bebas Neue',system-ui,sans-serif;letter-spacing:.14em;font-size:1.3rem;color:var(--cyan)}
 .nav .spacer{flex:1}
 .nav a{color:var(--dim);font-size:.92rem}
 .nav a:hover{color:var(--ink);text-decoration:none}
@@ -52,27 +54,27 @@ header{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
 .btn{display:inline-block;border-radius:10px;font-weight:700;cursor:pointer;border:1px solid transparent;
   padding:11px 18px;font-size:.95rem;transition:transform .08s ease,box-shadow .2s ease}
 .btn:hover{text-decoration:none;transform:translateY(-1px)}
-.btn-primary{background:linear-gradient(135deg,#22d3ee,#0891b2);color:#06141b;
+.btn-primary{background:linear-gradient(135deg,#D96444,#B5492E);color:#160905;
   box-shadow:0 6px 22px -8px var(--glow)}
 .btn-primary:hover{box-shadow:0 10px 30px -8px var(--glow)}
-.btn-ghost{background:rgba(34,211,238,.10);border-color:rgba(34,211,238,.45);color:var(--ink)}
+.btn-ghost{background:rgba(217,100,68,.10);border-color:rgba(217,100,68,.45);color:var(--ink)}
 .btn-sm{padding:8px 14px;font-size:.88rem}
 
 /* hero */
 .hero{padding:64px 0 36px;text-align:center}
 .kicker{display:inline-block;font-size:.78rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--cyan);background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.3);
+  color:var(--cyan);background:rgba(217,100,68,.10);border:1px solid rgba(217,100,68,.3);
   padding:5px 12px;border-radius:999px;margin-bottom:20px}
 .hero h1{font-size:clamp(2rem,5vw,3.3rem);line-height:1.08;margin:0 auto 16px;max-width:16ch;font-weight:800;letter-spacing:-.01em}
-.hero h1 .hl{background:linear-gradient(120deg,#22d3ee,#7dd3fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero h1 .hl{background:linear-gradient(120deg,#D96444,#5B92D4);-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero p.sub{font-size:clamp(1.02rem,2.2vw,1.22rem);color:var(--dim);max-width:60ch;margin:0 auto 28px}
 .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
 .platform{color:var(--faint);font-size:.85rem;margin-top:6px}
-.platform code{background:rgba(34,211,238,.10);border-radius:4px;padding:1px 6px;font-family:Consolas,monospace}
+.platform code{background:rgba(217,100,68,.10);border-radius:4px;padding:1px 6px;font-family:Consolas,monospace}
 
 /* hero shot */
 .shot{border:1px solid var(--line);border-radius:14px;overflow:hidden;
-  box-shadow:0 30px 80px -30px rgba(0,0,0,.8),0 0 0 1px rgba(34,211,238,.05);background:#0b1020}
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.8),0 0 0 1px rgba(217,100,68,.05);background:#0b1020}
 .hero-shot{max-width:980px;margin:40px auto 0;position:relative}
 .hero-shot::after{content:"";position:absolute;inset:-2px;border-radius:16px;pointer-events:none;
   box-shadow:0 0 60px -10px var(--glow);opacity:.35}
@@ -103,10 +105,10 @@ h2.sec{font-size:clamp(1.6rem,3.4vw,2.2rem);text-align:center;margin:8px 0 8px;f
 .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;counter-reset:s}
 .step{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 20px;position:relative}
 .step::before{counter-increment:s;content:counter(s);position:absolute;top:-14px;left:20px;width:30px;height:30px;
-  display:grid;place-items:center;border-radius:8px;background:linear-gradient(135deg,#22d3ee,#0891b2);color:#06141b;font-weight:800}
+  display:grid;place-items:center;border-radius:8px;background:linear-gradient(135deg,#D96444,#B5492E);color:#160905;font-weight:800}
 .step h3{margin:8px 0 6px;font-size:1.05rem}
 .step p{margin:0;color:var(--dim);font-size:.93rem}
-.step code{background:rgba(34,211,238,.10);border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:.88em}
+.step code{background:rgba(217,100,68,.10);border-radius:4px;padding:1px 6px;font-family:Consolas,monospace;font-size:.88em}
 
 /* faq */
 .faq{max-width:760px;margin:0 auto}
@@ -119,7 +121,7 @@ h2.sec{font-size:clamp(1.6rem,3.4vw,2.2rem);text-align:center;margin:8px 0 8px;f
 
 /* final cta */
 .final{text-align:center;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:48px 24px;
-  background-image:radial-gradient(600px 300px at 50% -20%,rgba(34,211,238,.12),transparent 70%)}
+  background-image:radial-gradient(600px 300px at 50% -20%,rgba(217,100,68,.12),transparent 70%)}
 .final h2{font-size:clamp(1.6rem,3.4vw,2.3rem);margin:0 0 10px}
 .final p{color:var(--dim);margin:0 auto 24px;max-width:48ch}
 
@@ -140,7 +142,7 @@ footer a{color:var(--dim)}
 
 <header>
   <div class="wrap nav">
-    <span class="brand"><span class="ck">ツCKヤ</span> DPS Meter</span>
+    <span class="brand">STOOP</span>
     <span class="spacer"></span>
     <a class="hide-sm" href="#features">Features</a>
     <a class="hide-sm" href="#shots">Screenshots</a>
@@ -287,7 +289,7 @@ footer a{color:var(--dim)}
 <section id="download">
   <div class="wrap">
     <div class="final">
-      <h2>Download TL-DPS-Meter</h2>
+      <h2>Download STOOP</h2>
       <p>Free, open-source, Windows 10/11. Pick the installer for set-and-forget, or the portable zip to run from anywhere.</p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/stoopkid713/TL-DPS-Meter/releases/latest/download/TL-DPS-Meter-Setup.exe">⬇ Installer (.exe)</a>
@@ -322,7 +324,7 @@ footer a{color:var(--dim)}
       <h2>Built on the shoulders of CKdpsApp</h2>
       <p style="max-width:64ch">This project exists because of <strong>SirPHz</strong> and the original
       <strong>ツCKヤ DPS Meter</strong> (CKdpsApp) — the first real combat-analytics tool for Throne and Liberty,
-      and the source of the party-DPS idea this whole app is built around. TL-DPS-Meter is an
+      and the source of the party-DPS idea this whole app is built around. <strong>STOOP</strong> is an
       <strong>independent successor</strong>: the party stack was rebuilt from scratch on owned infrastructure, so
       none of the original's code is used here — but the vision is entirely SirPHz's. If you haven't seen it,
       go give the original a look.</p>
