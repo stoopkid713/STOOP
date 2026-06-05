@@ -26,14 +26,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      # Inno Setup 6 — needed by build.py for STOOP-Setup.exe
-      - name: Install Inno Setup 6
-        run: choco install innosetup --version=6.3.3 -y --no-progress
+      # Inno Setup 6 is pre-installed on windows-latest (6.7.1+).
+      # choco upgrade is a no-op if already current; handles the case where
+      # a future runner image drops the pre-install.
+      - name: Ensure Inno Setup 6
+        run: choco upgrade innosetup -y --no-progress
 
       # Rust/Cargo — needed for the Tauri overlay (non-fatal if unavailable;
       # windows-latest ships Rust so this should succeed)
