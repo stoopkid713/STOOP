@@ -1,0 +1,86 @@
+name: Release Build
+
+# Builds and publishes signed release artifacts on version tags.
+# Produces: STOOP.exe (onefile), STOOP-Setup.exe (installer), STOOP-portable.zip, checksums.txt
+#
+# SignPath Foundation signing steps will be inserted between the build/upload steps
+# and the GitHub Release publish step once the application is approved.
+# See CODE_SIGNING_POLICY.md for the signing architecture.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # create/update GitHub Release
+  actions: read     # SignPath connector reads job metadata (needed post-approval)
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # never cancel an in-flight release build
+
+jobs:
+  build:
+    name: Build release artifacts
+    runs-on: windows-latest   # GitHub-hosted = qualifies as SignPath Trusted Build System
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Inno Setup 6 — needed by build.py for STOOP-Setup.exe
+      - name: Install Inno Setup 6
+        run: choco install innosetup --version=6.3.3 -y --no-progress
+
+      # Rust/Cargo — needed for the Tauri overlay (non-fatal if unavailable;
+      # windows-latest ships Rust so this should succeed)
+      - name: Build artifacts (PyInstaller + Inno Setup + overlay)
+        working-directory: backend
+        run: uv run --no-progress python build.py
+
+      # Upload each artifact separately so SignPath can sign them individually.
+      # artifact-id outputs are required by signpath/github-action-submit-signing-request.
+      - name: Upload STOOP.exe
+        id: up-exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: stoop-exe
+          path: backend/dist/STOOP.exe
+
+      - name: Upload STOOP-Setup.exe
+        id: up-setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: stoop-setup
+          path: backend/dist/STOOP-Setup.exe
+
+      - name: Upload STOOP-portable.zip
+        id: up-portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: stoop-portable
+          path: backend/dist/STOOP-portable.zip
+
+      - name: Upload checksums.txt
+        uses: actions/upload-artifact@v4
+        with:
+          name: stoop-checksums
+          path: backend/dist/checksums.txt
+
+      # ── SignPath signing steps go here after approval ──────────────────────
+      # See CODE_SIGNING_POLICY.md §Build & signing process and the annotated
+      # YAML in research/personal/tldps/2026-06-05_signpath-foundation-code-signing_v1.md §5.
+      # Pattern: sign STOOP.exe → repack installer+zip around signed exe → sign each.
+      # ──────────────────────────────────────────────────────────────────────
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            backend/dist/STOOP.exe
+            backend/dist/STOOP-Setup.exe
+            backend/dist/STOOP-portable.zip
+            backend/dist/checksums.txt

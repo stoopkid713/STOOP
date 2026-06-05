@@ -27,7 +27,7 @@ haven't seen the original, go give it a look:
 - 🌐 **[ckdps.netlify.app](https://ckdps.netlify.app/)** — SirPHz's original site
 - 💻 **[mjb6967/CKdpsApp](https://github.com/mjb6967/CKdpsApp)** — the original app
 
-See [LICENSE](LICENSE) · [NOTICE](NOTICE) · [LINEAGE.md](LINEAGE.md) for the full lineage.
+See [LICENSE](LICENSE) · [NOTICE](NOTICE) · [LINEAGE.md](LINEAGE.md) for the full lineage · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) · [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md)
 
 ---
 
