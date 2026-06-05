@@ -1,4 +1,6 @@
-# ツCKヤ DPS Meter
+# STOOP
+
+[![CI](https://github.com/stoopkid713/STOOP/actions/workflows/ci.yml/badge.svg)](https://github.com/stoopkid713/STOOP/actions/workflows/ci.yml)
 
 A combat-log analyzer for **Throne and Liberty** with two halves:
 
@@ -17,7 +19,7 @@ original ツCKヤ DPS Meter / [CKdpsApp](https://ckdps.netlify.app/).** SirPHz b
 real combat-analytics tool for Throne and Liberty — real-time parsing, build testing, and the
 party-DPS concept this whole project is built around. None of this would exist without it.
 
-TL-DPS-Meter is an **independent successor**, not a fork: the party stack was rebuilt from
+STOOP is an **independent successor**, not a fork: the party stack was rebuilt from
 scratch on owned infrastructure. The original is free for personal use and **not** open
 source, so none of its code is used here — but the vision is entirely SirPHz's. If you
 haven't seen the original, go give it a look:
@@ -48,8 +50,10 @@ Two ways to get it — pick one:
 
 *(Or browse [all releases](https://github.com/stoopkid713/STOOP/releases/latest).)*
 
-**Windows 10/11.** First launch shows a SmartScreen "unknown publisher" warning
-(unsigned build) — click **More info → Run anyway**.
+**Windows 10/11.** Both the installer and the portable `.exe` show a Windows SmartScreen
+"unknown publisher" notice on first launch — click **More info → Run anyway**. This is a
+standard warning for unsigned apps (code signing is on the roadmap). See
+[Is it safe?](#is-it-safe) in the FAQ if you want more detail.
 
 Then in Throne & Liberty, enable Combat Logging *(Settings → Shortcuts → Ring Menu →
 add **"Combat Meter"**)* and activate it from the Ring Menu. T&L writes logs *after*
@@ -186,8 +190,20 @@ during. Stats (solo and party) appear after each fight ends.
 **Can I get banned?** The tool only reads log files the game generates. It does not
 inject into, modify, or interact with the game process.
 
-**Why does antivirus / SmartScreen flag the exe?** False positive from unsigned
-PyInstaller packaging. The source is in this repo — build it yourself if you prefer.
+**Is it safe?**
+
+Yes. STOOP only reads the log files Throne & Liberty writes to disk — it does not inject
+into, hook, or interact with the game process in any way. The full source is in this repo
+and can be audited line by line.
+
+*SmartScreen "unknown publisher":* this notice appears because the exe isn't code-signed
+yet (on the roadmap). It's the same warning any unsigned Windows app gets, regardless of
+what it does — click **More info → Run anyway** to proceed.
+
+*Antivirus flags:* a false positive from PyInstaller's packaging (it bundles a Python
+runtime into a single `.exe`, which some scanners misread as suspicious). If you want to
+verify your download, each release includes a `checksums.txt` — check it against your file
+with `certutil -hashfile STOOP.exe SHA256`. Or build from source (see above).
 
 **How do I filter to only my damage?** Settings → Player Name → your character name.
 

@@ -261,6 +261,30 @@ def build_installer() -> int:
     return 0
 
 
+def write_checksums() -> int:
+    """Write SHA-256 checksums for release artifacts to dist/checksums.txt.
+
+    Covers whichever of STOOP.exe / STOOP-portable.zip / STOOP-Setup.exe exist so
+    users can verify their download with:
+        certutil -hashfile STOOP.exe SHA256
+    """
+    import hashlib
+
+    artifacts = [f for f in [EXE, PORTABLE_ZIP, SETUP] if f.is_file()]
+    if not artifacts:
+        print("no artifacts found — skipping checksums", file=sys.stderr)
+        return 0
+    lines = []
+    for path in artifacts:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        lines.append(f"{digest}  {path.name}")
+        print(f"SHA256  {path.name}  {digest}")
+    out = DIST / "checksums.txt"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"CHECKSUMS -> {out}")
+    return 0
+
+
 def main(argv: list[str]) -> int:
     inline_party_render()  # refresh the shared party_render.js into base + overlay (non-fatal)
     inline_js_modules()    # refresh src/js/*.js into index.html's @inject regions (non-fatal)
@@ -275,8 +299,13 @@ def main(argv: list[str]) -> int:
         return rc
     if "--no-installer" in argv:
         print("(--no-installer) skipping installer build")
+        write_checksums()
         return 0
-    return build_installer()
+    rc = build_installer()
+    if rc != 0:
+        return rc
+    write_checksums()
+    return 0
 
 
 if __name__ == "__main__":
