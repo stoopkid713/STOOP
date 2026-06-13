@@ -1657,6 +1657,7 @@ export class PartyRoom {
 
   _ensureAnalyticsTable() {
     if (!this.env.ANALYTICS_DB) return false;
+    if (this._analyticsTableReady) return true;
     try {
       this.env.ANALYTICS_DB.exec(
         `CREATE TABLE IF NOT EXISTS encounter_analytics (
@@ -1683,6 +1684,7 @@ export class PartyRoom {
       this.env.ANALYTICS_DB.exec(
         `CREATE INDEX IF NOT EXISTS idx_analytics_created ON encounter_analytics(created_at)`
       );
+      this._analyticsTableReady = true; // only mark ready on a fully successful DDL pass
     } catch (_) {}
     return true;
   }
