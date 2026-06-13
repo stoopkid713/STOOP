@@ -30,9 +30,16 @@ const workerDir = join(here, "../../workers/party");
 
 function wranglerD1(sql) {
   try {
+    // ROOT-CAUSE FIX: flatten to a SINGLE LINE. Multi-line SQL (template-literal newlines)
+    // embedded in the Windows cmd.exe command string breaks the spawn and throws a
+    // UV_HANDLE_CLOSING libuv crash (src\win\async.c). count/raw used single-line SQL so they
+    // survived; every multi-line command crashed. SQL is whitespace-insensitive, so collapsing
+    // whitespace runs to single spaces is semantically identical and fixes every command here.
+    const flatSql = sql.replace(/\s+/g, " ").trim();
     const out = execSync(
-      `npx wrangler d1 execute ${DB} --remote --json --command "${sql.replace(/"/g, '\\"')}"`,
-      { cwd: workerDir, stdio: ["pipe", "pipe", "pipe"] }
+      `npx wrangler d1 execute ${DB} --remote --json --command "${flatSql.replace(/"/g, '\\"')}"`,
+      // windowsHide avoids a flashed console; 16MB buffer headroom for large --json result sets.
+      { cwd: workerDir, stdio: ["ignore", "pipe", "pipe"], windowsHide: true, maxBuffer: 16 * 1024 * 1024 }
     ).toString();
     const parsed = JSON.parse(out);
     // wrangler d1 --json returns an array of result objects; first one has the rows
