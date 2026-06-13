@@ -154,9 +154,9 @@ function cmdAccuracy() {
     SELECT
       boss_name,
       COUNT(*) AS fights,
-      ROUND(AVG(json_extract(detail, '$.quality.crit_rate')) * 100, 1)       AS crit_pct,
-      ROUND(AVG(json_extract(detail, '$.quality.heavy_rate')) * 100, 1)      AS heavy_pct,
-      ROUND(AVG(json_extract(detail, '$.quality.crit_heavy_rate')) * 100, 1) AS crit_heavy_pct
+      ROUND(AVG(json_extract(detail, '$.quality.crit_rate')), 1)       AS crit_pct,
+      ROUND(AVG(json_extract(detail, '$.quality.heavy_rate')), 1)      AS heavy_pct,
+      ROUND(AVG(json_extract(detail, '$.quality.crit_heavy_rate')), 1) AS crit_heavy_pct
     FROM encounter_analytics
     WHERE boss_name IS NOT NULL
       AND json_extract(detail, '$.quality.hits') IS NOT NULL
