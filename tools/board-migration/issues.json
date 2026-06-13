@@ -1,0 +1,425 @@
+[
+  {
+    "key": "tier1-detailview-parse-abort",
+    "title": "Detail-view parse aborts on one bad line (encounter_scan.py:313)",
+    "body": "From the 2026-06-09 code audit — Tier 1, HIGH, the only high-severity finding.\n\n`parse_encounter_details` has NO per-line try/except (unlike `parse_encounters_from_log` L199-202); one bad timestamp -> the outer except returns `None` -> the **whole detail view goes blank**.\n\n**Fix:** wrap the per-line body in `try/except: continue` so one malformed line is skipped instead of killing the parse.\n\nArea: backend. Source: punchlist Tier 1.",
+    "labels": ["type:bug", "area:backend"],
+    "priority": "Now",
+    "status": "Next Up"
+  },
+  {
+    "key": "scoreboard-multiphase-combine",
+    "title": "Party scoreboard under-reports multi-phase boss (shows one phase, not the kill total)",
+    "body": "Confirmed live 2026-06-01 (3-person party, Calanthia 2-phase).\n\nPhase 1 \"Calanthia\" 18.42M + phase 2 \"Calanthia of Destruction\" 28.05M = **46.47M**. The **Compare tab correctly combines** both phases (46,704,420). The **Scoreboard shows only the active phase** (28,046,542) — under-reporting the full boss kill.\n\n**Fix:** the party scoreboard must aggregate a boss's phase-encounters into one boss-kill total (match Compare), OR treat a multi-phase boss as a single encounter. Seam: worker `buildScoreboard` / encounter grouping + frontend scoreboard render.\n\nThe new analytics `is_phase` flag (shipped 2026-06-13) now records phase grouping in telemetry to help validate the fix.",
+    "labels": ["type:bug", "area:worker"],
+    "priority": "Now",
+    "status": "Next Up"
+  },
+  {
+    "key": "encounter-combine-decision",
+    "title": "Encounter-combine: pick the segmentation strategy (Option 1 / 2 / 3)",
+    "body": "Workstream analyzed 2026-06-04, decision-ready. Full design + 4 proposals + corpora: oracle `docs/WORKSTREAM-ENCOUNTER-COMBINE.md`.\n\n**Decide:** Option 1 (null-suppress) / Option 2 (time-window) / Option 3 (staged).\n\nThe analytics D1 (firing reliably in prod as of 2026-06-13) is collecting real gap-distribution data to calibrate this — see `analytics.mjs gaps`. Area: worker (segmentation).",
+    "labels": ["type:enabler", "area:worker"],
+    "priority": "Now",
+    "status": "Next Up"
+  },
+  {
+    "key": "logging-state-machine",
+    "title": "\"Are you logging?\" detection is finicky — needs a deterministic state machine (#14)",
+    "body": "The logging-state detection (own-client banner + per-member \"not logging\" badge) is timing-sensitive and unreliable: log file appears late / combat starts before vs after app open -> state doesn't flip cleanly.\n\n**Needs** a deterministic state machine: distinguish **no log file** vs **log file but no recent combat (\"waiting\")** vs **logging + transmitting**, with reliable live transitions and accurate per-member transmit status. Design doc: oracle `docs/WORKSTREAM-LOGGING-STATE-MACHINE.md`. First action = reproduce + characterize; fold into the sim test battery. Seams: backend `dps_meter_server` + frontend `party.js`.",
+    "labels": ["type:bug", "area:backend"],
+    "priority": "Now",
+    "status": "Next Up"
+  },
+  {
+    "key": "log-grab-reliability",
+    "title": "Recorder sometimes misses the combat log (OFF/ON fixes it) — log_watcher pickup bug",
+    "body": "User feedback 2026-06-06 (Discord). The recorder sometimes doesn't pick up the combat log; a quick OFF/ON of the recorder fixes it. Real `log_watcher` file-grab bug.\n\n**Fix:** investigate the watcher's file-grab + add an in-app \"restart recording / re-grab log\" affordance + detection so users don't need the manual toggle. Ties to #14. Area: backend (`log_watcher`).",
+    "labels": ["type:bug", "area:backend"],
+    "priority": "Now",
+    "status": "Next Up"
+  },
+  {
+    "key": "code-signing",
+    "title": "Code signing (SignPath Foundation) — stop the \"unknown publisher\" flag",
+    "body": "In progress. Full record: oracle `docs/TRUST-OPS.md`.\n\n- SignPath Foundation applied 2026-06-05 (watch kjricciardi@gmail.com). Phase 0 shipped: CODE_OF_CONDUCT.md, CODE_SIGNING_POLICY.md, release-build.yml. After approval: wire `signpath/github-action-submit-signing-request` + \"Signed by SignPath Foundation\" on the releases page.\n- MS Defender FP submitted. Azure fallback if SignPath declines.\n\nUser-facing urgency reaffirmed by community feedback. Area: docs/infra.",
+    "labels": ["type:feature", "area:docs"],
+    "priority": "Now",
+    "status": "Next Up"
+  },
+
+  {
+    "key": "onboarding-recording-setting",
+    "title": "Onboarding: combat-log RECORDING is a separate in-game setting users can't find",
+    "body": "Confirmed by a user (superluigi77): the combat-log recording toggle is NOT on the ring menu and is a *different* setting than the in-game Analyzer, so testers don't realize they must enable it.\n\n**Fix:** explicit first-run setup guidance showing exactly where T&L's combat-log recording toggle is. Pairs with the explainer content. Ties to #14 detect-and-guide. Area: frontend/docs.",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "explainer-content",
+    "title": "Explainer content — short videos / shorts / clips / gifs",
+    "body": "Make the app super easy to share and understand (Kyle, 2026-06-06). Short videos / shorts / clips / gifs covering setup + use. Pairs with the onboarding-recording-setting guidance. Area: docs.",
+    "labels": ["type:feature", "area:docs"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "community-discord",
+    "title": "Stand up a small community Discord (\"baby discord for discussion\")",
+    "body": "A small community/discussion server (Kyle, 2026-06-06). See oracle `docs/WORKSTREAM-DISCORD-COMMUNITY.md`. Area: docs/growth.",
+    "labels": ["type:feature", "area:docs"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+
+  {
+    "key": "stale-party-code-clobber",
+    "title": "Stale party_code race-clobbers create/join (HIGH — blocks making a new party)",
+    "body": "HIGH bug, found live 2026-06-01 + confirmed end-to-end in code and via worker tail.\n\n**Symptom:** a left-but-still-open party stays alive (stale); other members hitting \"Create Party\" keep getting reconnected to that stale code — the freshly generated code gets clobbered back to the backend's current `party_code`.\n\n**Root cause:** the Python backend's `party.party_code` (set in `party_state.py start_recording`, emitted in every status payload) is **never cleared on leave**. `leaveParty()` resets locally + messages the room but doesn't tell the backend to clear it; the client status-sync re-applies the old code, clobbering create/join. It's a timing **race** (a successful fresh create was also caught). Worker enables it: no disband-on-leader-leave, no TTL/alarm, lazy ghost eviction -> stale rooms never self-clean.\n\n**Fix (cure + defense):** (a) `leaveParty()` + `createParty()` clear/replace the backend `party_code` so status stops emitting the stale one, and a status poll must not overwrite an in-flight create/join (make create/join authoritative); (b) worker disband-on-leader-leave + `alarm()`-driven idle TTL (+ run `_evictGhosts` on the alarm). Pre-build check: does `_h_clear_party` (`dps_meter_server.py:1035`) already null `party_code`? Seams: worker `index.js` lifecycle · backend `party_state.py`/`dps_meter_server.py` · frontend `party.js`.",
+    "labels": ["type:bug", "area:worker"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "overlay-app-desync",
+    "title": "Overlay ↔ app state desync for the same room",
+    "body": "Confirmed live 2026-06-01: app member and overlay (spectator) are on the SAME room (same code = same DO) but show different state — app \"No encounters yet\" (local list wiped by leave/reset) while overlay shows the room's RETAINED list (18 old encounters). The overlay isn't on a different party; it surfaces the room backlog the app dropped locally.\n\n**Coherent fix:** a new party = a FRESH room (disband/reset old), AND both app + overlay reflect the room's CURRENT state (app re-hydrates its encounter list from the room instead of wiping; overlay follows the active encounter). Seams: worker `index.js` (room reset/disband/TTL + snapshot) · frontend `party.js` (re-hydrate on reconnect) · `encounter-edit.js` overlay. Converges with stale-party-code-clobber + leave-wipes-local-logs.",
+    "labels": ["type:bug", "area:worker"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "leave-wipes-local-logs",
+    "title": "Leaving a party WIPES the local party logs (Kyle wants them to persist)",
+    "body": "From Kyle's in-app bug report 2026-06-01. `leaveParty()` (`party.js:655`) clears `partyState.encounters/boards/results/scoreboard` on leave -> party encounter history vanishes on leave/re-enter.\n\n**Want:** party logs/encounter history persist locally after leaving. Likely fix: persist in-session party encounters to local storage before clearing transport state, reload in the party view even when disconnected. Ties to F3 persistence (`saved_runs.json`). Seam: frontend `party.js` (leave path) + local persistence; possibly `member-detail-tabs.js`.",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "roster-leader-desync",
+    "title": "Roster / leader display desync vs worker truth",
+    "body": "Part of the Party-room lifecycle cluster (Cluster A). Roster/leader display can drift from the worker's actual state (a transient client roster desync was observed during the stale-party investigation — e.g. a phantom \"1/1 self-as-leader\" view when the real leader was connected).\n\n**Fix:** roster/leader display must equal worker truth; reconcile on every scoreboard/roster broadcast. Add as a named regression scenario in the sim battery. Seams: worker `index.js` roster/scoreboard · frontend `party.js`.",
+    "labels": ["type:bug", "area:worker"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "encounter-switcher-flood",
+    "title": "Encounter switcher floods with no-boss \"Recording…\" segments",
+    "body": "Live 2026-06-01: the switcher showed 11 encounters in ~16 min, almost all stuck at \"Recording…\". Root cause: \"Recording…\" = an encounter with no boss detected (`member-detail-tabs.js:392`); segmentation rolls a new encounter on every combat gap (30s non-boss / 45s boss, `encounter_boundary.py:26-28`) and every gap-bounded segment is created + listed regardless of boss. The P0 trash fix corrected the label, not the clutter.\n\n**Fix:** surface only boss-resolved encounters (+ the live one): (a) hide no-boss/\"Recording…\" entries from the switcher (simplest), or (b) don't promote a segment to a kept switcher encounter unless a known boss is involved. Seams: frontend `party_render.js`/`member-detail-tabs.js` and/or worker + client segmentation. 🔗 ties to encounter-combine.",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+
+  {
+    "key": "window-60s-cluster",
+    "title": "60s-window cluster — long fights silently truncated at 60s",
+    "body": "From the 2026-06-09 audit (Tier 1). TL bosses run 3-15 min but several windows cap at 60s:\n- `overlay/src/index.html:348` rotationStats 0-60 buckets\n- `party_render.js:151` 61-bucket cap -> activityRate wrong (trophy claim was WRONG — computeTrophies already full-duration)\n- `party_render.js:322` rotationChartHtml hardcodes 61 bars + \"0s…60s\" axis (fix WITH the bucketing)\n- `backend/encounter_scan.py:400` `dps_60s` always /60 (verify intent — may be \"first-60s DPS\" by design)\n- `src/js/log-export.js:531` calculate5SecBurst loop stops at 55 -> damage at sec 60 in no window\n\nOne conceptual fix (window length) across these spots. Area: frontend (+ backend verify).",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "overlay-stuck-loading",
+    "title": "Overlay stuck \"Loading…\" forever (overlay/src/index.html:906)",
+    "body": "From the 2026-06-09 audit (Tier 1). `ovEnsureDetail` skips re-request if ANY cache entry exists, but the handler caches `{rotation:null}` on a null reply -> permanent \"Loading…\".\n\n**Fix:** only skip the re-request when rotation is a non-empty array. Area: overlay.",
+    "labels": ["type:bug", "area:overlay"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "stale-encounter-reconnect",
+    "title": "Stale encounter after every reconnect (src/js/party.js:382)",
+    "body": "From the 2026-06-09 audit (Tier 1). `welcome` only advances `viewing_encounter_id` when it's null.\n\n**Fix:** mirror the `encounters` handler — advance only if the user was following the active encounter (not pinned). Area: frontend.",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "load-saved-corrupts-live",
+    "title": "Load saved encounter corrupts live view while recording (dps_meter_server.py:725)",
+    "body": "From the 2026-06-09 audit (Tier 1). Loading a saved encounter resets `s.stats` + loads history, but the watcher then merges new live hits into the historical buffer (`reset_after_timestamp` not updated).\n\n**Fix:** refuse load while recording, or set `reset_after_timestamp = now()`. Area: backend.",
+    "labels": ["type:bug", "area:backend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "feedback-context-unbounded",
+    "title": "Feedback `context` stored unbounded (workers/party/src/feedback.js:95)",
+    "body": "From the 2026-06-09 audit (Tier 2) — the only remaining Tier-2 item after the analytics-write-path fixes shipped 2026-06-13. No type/size cap on the client `context` field before it goes to KV.\n\n**Fix:** require a plain object, ~2KB cap. Area: worker.",
+    "labels": ["type:bug", "area:worker"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "duplicate-run-ids",
+    "title": "Duplicate run IDs (dps_meter_server.py:867)",
+    "body": "From the 2026-06-09 audit (Tier 3). `strftime` 1s resolution + no dedup -> ID collisions.\n\n**Fix:** `uuid.uuid4().hex`. Area: backend.",
+    "labels": ["type:bug", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "wrong-encounter-toggle-reorder",
+    "title": "Wrong encounter toggled after reorder (src/js/targets-assign.js:1025)",
+    "body": "From the 2026-06-09 audit (Tier 3). `toggleRunAttemptFlag(idx)` uses the sorted-display index vs live `runEncounters`; same at removeFromRun L937/991/1089.\n\n**Fix:** key by stable id / start_time, not display index. Area: frontend.",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "gap-warning-inverted",
+    "title": "Gap warning inverted (src/js/targets-assign.js:182)",
+    "body": "From the 2026-06-09 audit (Tier 3). Fires only `>=60 && <=90`, so gaps >90s show nothing.\n\n**Fix:** drop the upper bound. Area: frontend.",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "infinity-avg-dps",
+    "title": "\"InfinityM\" Average DPS on single-hit encounter (src/js/encounter-stats.js:670)",
+    "body": "From the 2026-06-09 audit (Tier 3). Single-hit `duration=0` -> divide by zero -> \"InfinityM\".\n\n**Fix:** guard the denominator. Area: frontend.",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "aoe-hits-dropped-csv",
+    "title": "AoE hits dropped from combat log / CSV export (src/js/encounter-stats.js:867)",
+    "body": "From the 2026-06-09 audit (Tier 3). The dedup key lacks sub-second precision (stats themselves unaffected; export/CSV loses AoE hits).\n\n**Fix:** add `relative_time.toFixed(1)` to the dedup key. Area: frontend.",
+    "labels": ["type:bug", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "noop-save-bad-encounter-id",
+    "title": "No-op save on bad encounter id (dps_meter_server.py:817)",
+    "body": "From the 2026-06-09 audit (Tier 3). Writes a file + returns `encounter:null` on a bad id.\n\n**Fix:** guard + return an error. Area: backend.",
+    "labels": ["type:bug", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "tier4-hardening-cluster",
+    "title": "Tier-4 hardening cluster (11 low-severity items from the 2026-06-09 audit)",
+    "body": "Grouped checklist of the Tier-4 low/hardening findings (kept together to avoid 11 noise cards; split out if/when one is actively worked):\n\n- [ ] startup-crash swallowed in frozen build `backend/main.py:373`\n- [ ] hotkey read w/o barrier `backend/hotkey.py:87`\n- [ ] event-loop blocked 2s on shutdown `backend/log_watcher.py:73`\n- [ ] unrooted / exception-swallowing broadcast Tasks `backend/dps_meter_server.py:269`\n- [ ] config open-merge accepts unknown keys `:733`\n- [ ] crit-rate denom excludes misses vs live path (intended parity — just document) `backend/encounter_scan.py:309`\n- [ ] sim double-final frame `backend/tools/sim_party.py:532`\n- [ ] party color palette drifts across sessions `src/js/party.js:1780`\n- [ ] empty-rotation Infinity `src/js/rotation-oracle.js:29`\n- [ ] cosmetic off-by-one bar `src/js/rotation-oracle.js:56`\n- [ ] overlay memberDetails/boards caches never evicted `overlay/src/index.html:788`",
+    "labels": ["type:bug", "area:backend"],
+    "priority": "Parked",
+    "status": "Backlog"
+  },
+
+  {
+    "key": "obs-worker-ws-logging",
+    "title": "Observability #1 — worker WebSocket message logging",
+    "body": "Enabler. `wrangler tail` is blind to hibernated-WS message handlers (live post_fight/live_post). Add explicit non-hibernated logging so live party posts are visible without forcing a fresh join. Area: worker.",
+    "labels": ["type:enabler", "area:worker"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "obs-window-tldps",
+    "title": "Observability #3 — window.__tldps client state inspector",
+    "body": "Enabler. Expose client party/encounter state on `window.__tldps` so the sim test battery and CDP sessions can make clean assertions. Area: frontend.",
+    "labels": ["type:enabler", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "obs-remote-telemetry",
+    "title": "Observability #6 — remote telemetry",
+    "body": "Enabler. Remote telemetry channel for debugging live sessions beyond local logs. Area: worker. (See oracle WORKSTREAM-OBSERVABILITY-AND-BATTERY.md.)",
+    "labels": ["type:enabler", "area:worker"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "obs-code-change-log",
+    "title": "Observability #2 — code-change log",
+    "body": "Enabler. A running log of code changes for cross-session awareness (largely superseded by the GitHub board migration, but recorded). Area: docs.",
+    "labels": ["type:enabler", "area:docs"],
+    "priority": "Parked",
+    "status": "Backlog"
+  },
+  {
+    "key": "obs-cdp-debug-bat",
+    "title": "Observability #5 — CDP in the debug .bat",
+    "body": "Enabler. Wire the remote-debugging-port / CDP attach into the debug launcher batch by default. Area: docs/tooling.",
+    "labels": ["type:enabler", "area:docs"],
+    "priority": "Parked",
+    "status": "Backlog"
+  },
+  {
+    "key": "sim-test-battery",
+    "title": "Internal sim test battery (--smoke / --full) + release gate",
+    "body": "Reproduce/regress EVERYTHING from ONE machine, no live players. A single runner spins up `wrangler dev` + drives scenarios via `sim_party.py` bots + `fake_combat_log.py` + a Playwright/CDP-driven real frontend as the receiving client, asserting PASS/FAIL per scenario. Every bug found becomes a named regression scenario.\n\nCore rules: BOTH-SIDES (sender + receiver) and ADVERSARIAL (\"try to break it\" — race-hammer, fault-inject, fuzz, boundary-abuse, negative assertions). Two modes `--smoke`/`--full`. Full spec: oracle `docs/WORKSTREAM-OBSERVABILITY-AND-BATTERY.md`. Feeds the RELEASE GATE. Area: backend (tests/battery).",
+    "labels": ["type:enabler", "area:backend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "doc-maint-debugging-playbook",
+    "title": "Doc maintenance — PROJECT-GUIDE 03-debugging-playbook is stale",
+    "body": "The oracle `PROJECT-GUIDE/03-debugging-playbook.md` still lists the observability endpoints (`/rooms`, `/party/<CODE>/debug`, `obs_rooms.mjs`) as \"not yet built\" though Obs #4 shipped, and carries old pytest counts (~246-259) vs the current ~330+ collected. Refresh §9/§12 (+ the `--format pretty` tail nit). Oracle-repo edit. Area: docs.",
+    "labels": ["type:enabler", "area:docs"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+
+  {
+    "key": "desktop-os-integration",
+    "title": "Desktop window & OS integration (custom chrome · tray · start-at-boot · game-detect)",
+    "body": "Make the app feel native. Four pieces: (1) custom frameless window chrome + HTML title bar (must re-add Windows snap); (2) minimize to system tray (pystray + Pillow on its own thread; coordinate with single-instance); (3) start at boot (HKCU Run key / Startup shortcut + .iss option); (4) detect Throne launching -> background start (tray-resident polls for the TL process). Tray (2) is the foundation that makes game-detect (4) cheap. Seam: `main.py`/pywebview + a new tray module + Settings. Area: frontend.",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "startup-speed-onedir",
+    "title": "Startup speed — ship onedir for the installed build (MEASURE FIRST)",
+    "body": "Prime suspect = PyInstaller onefile unpack (re-extracts the whole bundle incl. the overlay exe to temp every launch). Biggest lever: ship onedir (folder) for the installed build via the installer (near-instant); keep the portable zip onefile. Secondary: defer heavy imports + non-critical init until after the window paints. PROFILE cold vs warm + time each phase before cutting. Seams: `build.py` · `.iss` · `main.py` · `index.html`. Area: backend/packaging.",
+    "labels": ["type:feature", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "responsive-layout",
+    "title": "Responsive layout for split / quarter-screen",
+    "body": "App must stay usable snapped to half-width, quarter, tall/narrow — how gamers run a meter beside the game. Add breakpoints (container/media queries): collapse sidebar, stack/reflow panels, compact party-board + drill-down tables, keep tabs reachable. Generalizes the existing party-first sidebar auto-collapse to every screen at any size. Pairs with custom-window-chrome (frameless must keep Windows snap). Seam: `index.html` CSS (+ maybe `core-init.js`). Area: frontend.",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "wire-solo-lab-tools",
+    "title": "Wire in mastery-planner + pvp-calc as Solo Lab screens",
+    "body": "Kyle's own public repos `stoopkid713/tl-mastery-planner` (weapon mastery XP planner) and `stoopkid713/TnL3.31.patch.pvpcalc` (PvP stat calculator). Slot into the Solo Lab overflow pattern as new tabs. Preferred integration: port/embed their HTML/JS as `src/js/` modules -> re-inline into `index.html` (offline-first, matches Solo Lab; manage drift). Overlaps game-data hardening (planner could consume `getWeaponSpecializations`). Seam: frontend `src/js/` (+ build re-inline). Area: frontend.",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "spectator-join-ui",
+    "title": "Spectator JOIN mode (user-facing UI)",
+    "body": "The server-side plumbing exists — `?spectator=1` connects read-only (doesn't count toward the 12-cap, no roster entry, can't post, gets the live board + drill-down). MISSING = a user-facing way to join as spectator (a \"Join as spectator\" option / spectator invite-link variant). Frontend only (`src/js/party.js` join flow + join.html) — no worker change. Area: frontend.",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "vanguard-party-split",
+    "title": "Vanguard mode — leader assigns Party 1 / Party 2",
+    "body": "T&L raid vanguard = the 12-cap split into two 6-person parties. Leader-side assignment UI (drag/pick each member into P1 or P2) + worker state for the sub-party grouping (`members[user_id].party = 1|2`, broadcast in roster/scoreboard) + board grouped/sectioned by party (per-party totals). Leader-only. Touches worker (`index.js` roster/scoreboard) + frontend (`party.js` + `party_render.js`). Area: worker.",
+    "labels": ["type:feature", "area:worker"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "gamedata-hardening",
+    "title": "Harden the game-data pipeline for future T&L content patches",
+    "body": "A new weapon class is coming + ongoing new bosses/dungeons/skills. Most paths self-heal via the weekly refresh Action, but ONE silently breaks: a NEW WEAPON CLASS — the 11 weapon cards are hardcoded twice (`index.html` `data-weapon` cards + `WEAPON_MAP` in `refresh_game_data.py:167`); `weapon_slug()` maps unknown -> `'other'` (invisible, no error).\n\n**Harden:** (a) make the weapon-card list data-driven from `weapon_config.json`; (b) guardrail that detects an unmapped weapon mainCategory and surfaces it loudly (Action warning) instead of bucketing to `other`; (c) API-drift GATE (promote `--counts` to an Action sanity gate that FAILS on count/required-field misses); (d) surface the reconcile review-bucket size; (e) detect unknown content categories. Deliverable: a \"patch-drop checklist\" doc. Ties to leaderboard-taxonomy. Area: game-data.",
+    "labels": ["type:enabler", "area:game-data"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "whole-folder-log-ingest",
+    "title": "Whole-folder combat-log ingest",
+    "body": "Ingest an entire combat-log folder (not just the latest file) so historical/rolled logs are captured. Seam: backend `log_watcher`. Own session. Area: backend.",
+    "labels": ["type:feature", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "tldps-join-protocol",
+    "title": "tldps:// join protocol handler",
+    "body": "Register a `tldps://join` custom URL protocol so an invite link opens the app straight into a party. Installer registers the handler + `main.py` parses the launch arg + `party.js` joins. Seams: installer + `main.py` + `party.js`. Area: backend.",
+    "labels": ["type:feature", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "leaderboard-taxonomy",
+    "title": "Leaderboard taxonomy (content-type × tier × boss classification)",
+    "body": "Rankings must be apples-to-apples: classify each cleared encounter by content type × tier × boss. Raids: difficulty Normal/Difficult/Nightmare per boss (1/2/3); Dungeons: by tier; Trials: by tier. Needs a content/tier map (extend `refresh_game_data.py` + the boss/dungeon DB) so each boss/dungeon/trial knows its content-type + tier; then the leaderboard worker keys boards on `(content_type, tier, boss)`. Pairs with public-leaderboards + share button + gamedata-hardening. Area: game-data.",
+    "labels": ["type:feature", "area:game-data"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+
+  {
+    "key": "per-target-drilldown",
+    "title": "Per-TARGET drill-down (gold-standard gap-closer — data parsed, UI missing)",
+    "body": "Per-target damage is already aggregated server-side (as share in `combat_stats._targets`) and transmitted, but there's no UI to drill into per-target breakdown. Build the UI. Area: frontend. (Gold-standard comparison gap-closer.)",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "accuracy-hit-quality-stat",
+    "title": "Full accuracy / hit-quality stat (hit_type — needs client plumbing + release)",
+    "body": "Gold-standard gap-closer AND the parked follow-up from the 2026-06-13 analytics work. `hit_type` (kMiss/kNormalHit/kMaxByCrit/...) is parsed per-hit in the solo path but NOT plumbed through the party path (`party_state.py:121`), so true accuracy-with-misses can't be aggregated server-side today. The cloud telemetry already records crit/heavy quality; full accuracy needs: plumb `hit_type` into the party post (backend `party_state.py` / `dps_meter_server.py`) + a client release, then aggregate. Pairs with app-version-stamp-telemetry (same client-release bundle). Area: backend.",
+    "labels": ["type:feature", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "sqlite-encounter-index",
+    "title": "SQLite encounter index (gold-standard gap-closer)",
+    "body": "Index saved encounters in SQLite for fast history/search instead of scanning JSON files. Gold-standard comparison gap-closer. Area: backend.",
+    "labels": ["type:enabler", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+
+  {
+    "key": "public-leaderboards",
+    "title": "Public leaderboards (gated behind auth)",
+    "body": "Public boss-kill rankings on owned Cloudflare infra. Depends on the leaderboard-taxonomy classification AND an end-user auth/identity model (anti-spoof, dedup) — per the analytics data-collection design, no identity-bearing collection happens until auth exists. Area: worker. Parked until auth.",
+    "labels": ["type:feature", "area:worker"],
+    "priority": "Parked",
+    "status": "Backlog"
+  },
+  {
+    "key": "share-button-short-url",
+    "title": "Easy share button + super-tiny share URL",
+    "body": "Two coupled notes (Kyle, 2026-06-02): (1) an easy, prominent one-tap share affordance (party view + boss-run/parse share) generalizing the existing B2 \"Copy Invite Link\"; (2) a super-short link (e.g. `tldps.gg/XZFH`) = a small owned-Cloudflare short-link/redirect Worker (short code -> 302 to the full `join.html#<CODE>` or a hosted run-view) on a short domain. The share button copies/opens the TINY url. Domain registration = Kyle's action. Seams: frontend `party.js` + a new short-link worker. Area: frontend.",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Next",
+    "status": "Backlog"
+  },
+  {
+    "key": "feedback-read-inbox",
+    "title": "Feedback READ view / inbox",
+    "body": "Intake is verified working (POST /feedback -> {ok,ref} -> KV; KV holds real reports). MISSING = an authed `GET /feedback/list` + a minimal HTML viewer so reports can be read without the CF dashboard / `wrangler kv key list --remote`. (Note: `--remote` is mandatory — wrangler v4 defaults to the local store.) Area: worker.",
+    "labels": ["type:feature", "area:worker"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "tester-telemetry-upload",
+    "title": "Tester telemetry / log auto-upload",
+    "body": "Debug builds phone logs home to the worker on error/feedback so we stop chasing testers for files. Reuses `/feedback` + a ring buffer. Proven need: all 3 stored feedback reports carried NO logs (context = only app_version/ua/screen). Pairs with the bug-report backend log-tail enrichment. Area: backend.",
+    "labels": ["type:feature", "area:backend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "update-button-top-right",
+    "title": "Move the Update button to the top-right header (manual, click-to-check)",
+    "body": "Today the `Updates` button lives in the sidebar controls (`index.html:9058`) + collapsed-strip icon + a Settings-tab copy; it's already manual-only / no auto-check (correct per Kyle). Move it to the top-right header, visible, click-to-confirm; trim the redundant copies (keep Settings as secondary at most). Small frontend move (`index.html` markup/CSS + header module) -> re-inline; Playwright capture to confirm placement. Area: frontend.",
+    "labels": ["type:feature", "area:frontend"],
+    "priority": "Later",
+    "status": "Backlog"
+  },
+  {
+    "key": "app-version-stamp-telemetry",
+    "title": "App-version stamp in analytics telemetry (needs client release)",
+    "body": "Parked follow-up from the 2026-06-13 analytics data-collection work. The app version is not transmitted to the worker today (neither worker nor `party_state.py`/`dps_meter_server.py` sends it), so encounter_analytics rows can't be correlated to a client version. Needs a one-line client add to send the version + a release. Bundle with accuracy-hit-quality-stat (same client-release). Area: backend.",
+    "labels": ["type:enabler", "area:backend"],
+    "priority": "Parked",
+    "status": "Backlog"
+  }
+]
