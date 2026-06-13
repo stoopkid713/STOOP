@@ -101,6 +101,18 @@ function cmdGaps() {
     console.log(`\n  median=${median}s  p90=${p90}s  max=${max}s`);
     console.log(`  Current threshold: 30s (non-boss) / 45s (boss)`);
   }
+
+  const kinds = wranglerD1(`
+    SELECT segment_kind, COUNT(*) AS n
+    FROM encounter_analytics
+    WHERE segment_kind IS NOT NULL
+    GROUP BY segment_kind ORDER BY n DESC
+  `);
+  console.log("\n  Segment kinds:");
+  table(kinds, [
+    { key: "segment_kind", label: "kind" },
+    { key: "n",            label: "count" },
+  ]);
 }
 
 function cmdBosses() {
@@ -110,7 +122,7 @@ function cmdBosses() {
       boss_name,
       COUNT(*)            AS kills,
       ROUND(AVG(duration_s)) AS avg_dur_s,
-      ROUND(AVG(total_damage / 1000000.0), 2) AS avg_dmg_M,
+      ROUND(AVG(boss_damage / 1000000.0), 2) AS avg_dmg_M,
       ROUND(AVG(submission_count * 1.0 / party_size), 2) AS avg_capture
     FROM encounter_analytics
     WHERE boss_name IS NOT NULL
@@ -125,6 +137,56 @@ function cmdBosses() {
     { key: "avg_dur_s",    label: "Avg dur(s)" },
     { key: "avg_dmg_M",    label: "Avg dmg(M)" },
     { key: "avg_capture",  label: "Capture rate" },
+  ]);
+}
+
+function cmdAccuracy() {
+  console.log("\n── Hit-quality (crit/heavy) across boss fights ──");
+  console.log("   (from detail.quality; rows pre-migration show no quality)\n");
+  const rows = wranglerD1(`
+    SELECT
+      boss_name,
+      COUNT(*) AS fights,
+      ROUND(AVG(json_extract(detail, '$.quality.crit_rate')) * 100, 1)       AS crit_pct,
+      ROUND(AVG(json_extract(detail, '$.quality.heavy_rate')) * 100, 1)      AS heavy_pct,
+      ROUND(AVG(json_extract(detail, '$.quality.crit_heavy_rate')) * 100, 1) AS crit_heavy_pct
+    FROM encounter_analytics
+    WHERE boss_name IS NOT NULL
+      AND json_extract(detail, '$.quality.hits') IS NOT NULL
+    GROUP BY boss_name
+    ORDER BY fights DESC
+    LIMIT 30
+  `);
+  table(rows, [
+    { key: "boss_name",      label: "Boss" },
+    { key: "fights",         label: "Fights" },
+    { key: "crit_pct",       label: "Crit%" },
+    { key: "heavy_pct",      label: "Heavy%" },
+    { key: "crit_heavy_pct", label: "Crit+Heavy%" },
+  ]);
+}
+
+function cmdPhase() {
+  console.log("\n── Phase grouping (is_phase = continues prior boss) ──\n");
+  const rows = wranglerD1(`
+    SELECT
+      boss_name,
+      SUM(CASE WHEN is_phase = 1 THEN 1 ELSE 0 END) AS phase_rows,
+      COUNT(*)                                      AS total_rows,
+      ROUND(AVG(boss_damage / 1000000.0), 2)        AS avg_boss_M,
+      ROUND(AVG(trash_damage / 1000000.0), 2)       AS avg_trash_M
+    FROM encounter_analytics
+    WHERE boss_name IS NOT NULL
+    GROUP BY boss_name
+    ORDER BY total_rows DESC
+    LIMIT 30
+  `);
+  table(rows, [
+    { key: "boss_name",   label: "Boss" },
+    { key: "phase_rows",  label: "Phase rows" },
+    { key: "total_rows",  label: "Total rows" },
+    { key: "avg_boss_M",  label: "Avg boss(M)" },
+    { key: "avg_trash_M", label: "Avg trash(M)" },
   ]);
 }
 
@@ -209,19 +271,23 @@ function cmdRaw(sql) {
 const [,, cmd, ...rest] = process.argv;
 
 switch (cmd) {
-  case "gaps":    cmdGaps();              break;
-  case "bosses":  cmdBosses();            break;
-  case "capture": cmdCapture();           break;
-  case "recent":  cmdRecent(rest[0]);     break;
-  case "count":   cmdCount();             break;
-  case "raw":     cmdRaw(rest.join(" ")); break;
+  case "gaps":     cmdGaps();              break;
+  case "bosses":   cmdBosses();            break;
+  case "accuracy": cmdAccuracy();          break;
+  case "phase":    cmdPhase();             break;
+  case "capture":  cmdCapture();           break;
+  case "recent":   cmdRecent(rest[0]);     break;
+  case "count":    cmdCount();             break;
+  case "raw":      cmdRaw(rest.join(" ")); break;
   default:
     console.log(`
 analytics.mjs — encounter analytics for stoop-analytics D1
 
 Commands:
-  gaps            gap_before_s distribution for phase transitions
-  bosses          boss frequency, avg duration, avg damage
+  gaps            gap_before_s distribution + segment_kind counts
+  bosses          boss frequency, avg duration, avg boss damage
+  accuracy        crit/heavy quality distribution per boss (from detail.quality)
+  phase           is_phase grouping + boss/trash damage averages
   capture         partial-capture rate (submission_count vs party_size)
   recent [N]      last N rows (default 20)
   count           total row count
