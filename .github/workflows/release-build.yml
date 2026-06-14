@@ -24,13 +24,10 @@ jobs:
     name: Build release artifacts
     runs-on: windows-latest   # GitHub-hosted = qualifies as SignPath Trusted Build System
 
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'   # remove after actions update to Node 24
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v8.2.0
         with:
           enable-cache: true
 
@@ -50,27 +47,27 @@ jobs:
       # artifact-id outputs are required by signpath/github-action-submit-signing-request.
       - name: Upload STOOP.exe
         id: up-exe
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stoop-exe
           path: backend/dist/STOOP.exe
 
       - name: Upload STOOP-Setup.exe
         id: up-setup
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stoop-setup
           path: backend/dist/STOOP-Setup.exe
 
       - name: Upload STOOP-portable.zip
         id: up-portable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stoop-portable
           path: backend/dist/STOOP-portable.zip
 
       - name: Upload checksums.txt
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: stoop-checksums
           path: backend/dist/checksums.txt
@@ -82,7 +79,7 @@ jobs:
       # ──────────────────────────────────────────────────────────────────────
 
       - name: Publish to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true   # TODO: remove draft:true once signing is wired and tested
           files: |
