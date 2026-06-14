@@ -44,3 +44,6 @@ obs.mjs
 # Scratch / debug probes (underscore convention) — not shipped
 backend/tools/_bots_join.py
 tests/frontend/_cdp_*.js
+
+# Brainstorming visual-companion scratch — local only, never commit
+.superpowers/
