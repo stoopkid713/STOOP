@@ -21,7 +21,6 @@ import { buildAnalyticsBlock } from "./dashboard_analytics.js";
 
 // ---------------------------------------------------------------------------
 // Auth helper — mirrors /rooms and /party/<code>/debug gates exactly.
-// Returns null if the request is authorized, or a Response to return immediately.
 // ---------------------------------------------------------------------------
 function checkKey(env, url) {
   if (!env.DEBUG_KEY) return new Response("not found", { status: 404 });
@@ -33,8 +32,7 @@ function checkKey(env, url) {
 
 // ---------------------------------------------------------------------------
 // GET /dashboard.json?key=…
-// Aggregated JSON:
-//   { generated_at, live_rooms:[…], history:[…], feedback:[…] }
+//   { generated_at, live_rooms[], history[], feedback[], analytics{} }
 // ---------------------------------------------------------------------------
 export async function handleDashboardJson(request, env) {
   const url = new URL(request.url);
@@ -69,22 +67,16 @@ export async function handleDashboardJson(request, env) {
   let feedback = [];
   if (env.FEEDBACK_KV) {
     try {
-      // KV list() returns up to 1000 keys by default. For a feedback inbox this is
-      // sufficient; if it ever grows, cursor-based pagination can be added later.
       const { keys } = await env.FEEDBACK_KV.list({ prefix: "fb:" });
-      // Keys are in lexicographic order (oldest first via the millis-padded key).
-      // Read each value (the full record with message, context, etc.).
       const values = await Promise.all(
         keys.map(async (k) => {
           try {
-            const val = await env.FEEDBACK_KV.get(k.name, { type: "json" });
-            return val || null;
+            return (await env.FEEDBACK_KV.get(k.name, { type: "json" })) || null;
           } catch (_) {
             return null;
           }
         })
       );
-      // Return newest-first for the inbox view; filter out any nulls.
       feedback = values.filter(Boolean).reverse();
     } catch (_) {}
   }
@@ -101,22 +93,14 @@ export async function handleDashboardJson(request, env) {
 }
 
 // ---------------------------------------------------------------------------
-// GET /dashboard?key=…
-// Self-contained HTML page. Inline CSS + inline chart drawing (Canvas 2D API).
-// No CDN, no external libraries. The page client-fetches /dashboard.json
-// (passing the same key from the URL) and auto-refreshes every 30 s.
+// GET /dashboard?key=…  — self-contained HTML page (no CDN, no libs).
 // ---------------------------------------------------------------------------
 export function handleDashboard(request, env) {
   const url = new URL(request.url);
   const gate = checkKey(env, url);
   if (gate) return gate;
 
-  // The key is passed through to the page so JS can re-use it for /dashboard.json fetches.
-  // It never appears in the server-rendered HTML beyond this one assignment — the JS reads it
-  // from the URL's own query string at runtime (same origin, same key the user typed).
-  const html = buildDashboardHtml(url.origin);
-
-  return new Response(html, {
+  return new Response(buildDashboardHtml(url.origin), {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -127,408 +111,350 @@ export function handleDashboard(request, env) {
 }
 
 // ---------------------------------------------------------------------------
-// HTML builder — returns the full self-contained page as a string.
+// HTML builder — full self-contained page. Refined Dev-Dark, bento + drill-down,
+// inline zero-dependency SVG charts. Exported so a preview harness can render it.
 // ---------------------------------------------------------------------------
-function buildDashboardHtml(origin) {
+export function buildDashboardHtml(origin) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TL-DPS Party Dashboard</title>
+<title>STOOP · Party Dashboard</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0e1117;
-    --surface: #161b22;
-    --surface2: #21262d;
-    --border: #30363d;
-    --text: #c9d1d9;
-    --muted: #8b949e;
-    --accent: #58a6ff;
-    --green: #3fb950;
-    --yellow: #d29922;
-    --red: #f85149;
-    --orange: #db6d28;
-    --purple: #bc8cff;
+    --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --border: #30363d;
+    --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950;
+    --yellow: #d29922; --red: #f85149; --orange: #db6d28; --purple: #bc8cff;
     font-size: 14px;
   }
   body { background: var(--bg); color: var(--text); font-family: ui-monospace,SFMono-Regular,Consolas,monospace; min-height: 100vh; }
 
-  /* --- header --- */
   header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-  header h1 { font-size: 1rem; color: var(--accent); letter-spacing: .04em; flex: 1 1 auto; }
+  header h1 { font-size: 1rem; color: var(--accent); letter-spacing: .04em; flex: 1 1 auto; font-weight: 700; }
   #status-bar { font-size: .8rem; color: var(--muted); }
   #status-bar .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 5px; vertical-align: middle; }
-  #status-bar.ok .dot { background: var(--green); }
-  #status-bar.err .dot { background: var(--red); }
+  #status-bar.ok .dot { background: var(--green); } #status-bar.err .dot { background: var(--red); }
   #refresh-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: .8rem; }
   #refresh-btn:hover { border-color: var(--accent); }
 
-  /* --- tabs --- */
-  nav.tabs { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 0; padding: 0 20px; }
+  nav.tabs { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 0; padding: 0 20px; flex-wrap: wrap; }
   nav.tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; padding: 10px 16px; font-size: .875rem; transition: color .15s, border-color .15s; }
   nav.tabs button:hover { color: var(--text); }
   nav.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-  /* --- content area --- */
   main { padding: 20px; max-width: 1200px; margin: 0 auto; }
-  .panel { display: none; }
-  .panel.active { display: block; }
+  .panel { display: none; } .panel.active { display: block; }
 
-  /* --- cards / sections --- */
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-  .card h2 { font-size: .875rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
-  .stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 16px; }
-  .stat { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 16px; min-width: 120px; }
-  .stat .label { font-size: .75rem; color: var(--muted); margin-bottom: 4px; }
-  .stat .value { font-size: 1.5rem; color: var(--accent); font-weight: 600; }
+  .card h2 { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
 
-  /* --- canvas chart wrapper --- */
-  .chart-wrap { position: relative; width: 100%; height: 200px; margin-top: 8px; }
-  canvas { width: 100% !important; height: 100% !important; display: block; }
+  /* KPI strip */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .kpi .label { font-size: .7rem; color: var(--muted); letter-spacing: .04em; }
+  .kpi .value { font-size: 1.6rem; font-weight: 700; color: var(--accent); margin-top: 2px; }
+  .kpi .value.purple { color: var(--purple); }
 
-  /* --- tables --- */
-  .tbl-wrap { overflow-x: auto; }
+  /* bento grid */
+  .bento { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; cursor: pointer; transition: border-color .15s; min-height: 110px; }
+  .tile:hover { border-color: var(--accent); }
+  .tile .t-head { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 8px; }
+  .tile .t-tag { font-size: .64rem; font-weight: 700; }
+  .tag-growth { color: var(--accent); } .tag-game { color: var(--orange); } .tag-ops { color: var(--green); } .tag-fb { color: var(--purple); }
+  .tile.span2 { grid-row: span 2; }
+  .tile.pending { opacity: .5; border-style: dashed; cursor: default; }
+  .tile.pending:hover { border-color: var(--border); }
+  @media (max-width: 760px) { .bento { grid-template-columns: 1fr 1fr; } .tile.span2 { grid-row: auto; grid-column: span 2; } }
+
+  /* charts */
+  .chart { width: 100%; height: auto; display: block; }
+  .chart-donut { width: 96px; height: 96px; display: block; margin: 0 auto; }
+  .spark-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .spark-area { fill: rgba(88,166,255,.13); stroke: none; }
+  .bar { fill: #1f6feb; } .bar-h { fill: var(--orange); }
+  .svg-axis { fill: var(--muted); font-size: 8px; font-family: ui-monospace,monospace; }
+  .svg-label-l { fill: var(--text); font-size: 10px; font-family: ui-monospace,monospace; }
+  .svg-val { fill: var(--muted); font-size: 9px; font-family: ui-monospace,monospace; }
+  .svg-empty { fill: var(--muted); font-size: 11px; font-style: italic; }
+
+  .qline { font-size: .8rem; margin: 3px 0; } .qline b { float: right; }
+  .mini { font-size: .72rem; color: var(--text); margin: 3px 0; } .mini code { color: var(--accent); }
+
   table { width: 100%; border-collapse: collapse; font-size: .8rem; }
   th { color: var(--muted); text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   td { padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--surface2); }
-  .age-ok { color: var(--green); font-weight: 600; }
-  .age-warn { color: var(--yellow); font-weight: 600; }
-  .age-stale { color: var(--red); font-weight: 600; }
-  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: .7rem; white-space: nowrap; }
-  .badge-bug  { background: #451e1e; color: var(--red); }
-  .badge-idea { background: #1a2e1a; color: var(--green); }
-  .badge-fb   { background: #1e2240; color: var(--accent); }
+  tr:last-child td { border-bottom: none; } tr:hover td { background: var(--surface2); }
+  .age-ok { color: var(--green); font-weight: 600; } .age-warn { color: var(--yellow); font-weight: 600; } .age-stale { color: var(--red); font-weight: 600; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: .7rem; }
+  .badge-bug { background: #451e1e; color: var(--red); } .badge-idea { background: #1a2e1a; color: var(--green); } .badge-fb { background: #1e2240; color: var(--accent); }
   .note { font-size: .75rem; color: var(--yellow); margin-top: 8px; padding: 6px 10px; background: #2a2100; border-left: 3px solid var(--yellow); border-radius: 0 4px 4px 0; }
   .empty { color: var(--muted); font-style: italic; padding: 16px 0; text-align: center; }
-  .gh-count { color: var(--purple); font-weight: 600; }
   .feedback-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
   .feedback-card .meta { font-size: .75rem; color: var(--muted); margin-bottom: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
   .feedback-card .msg { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
-  .feedback-card .ctx { font-size: .72rem; color: var(--muted); margin-top: 6px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } @media (max-width:760px){ .grid2{ grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>&#9670; TL-DPS Party Dashboard</h1>
+  <h1>&#9670; STOOP · Party Dashboard</h1>
   <span id="status-bar"><span class="dot"></span><span id="status-text">Loading…</span></span>
   <button id="refresh-btn" onclick="load()">&#8635; Refresh</button>
 </header>
 
 <nav class="tabs">
-  <button class="active" onclick="showTab('adoption',this)">Adoption</button>
-  <button onclick="showTab('rooms',this)">Live Rooms</button>
-  <button onclick="showTab('feedback',this)">Feedback Inbox</button>
+  <button class="active" data-tab="overview" onclick="showTab('overview',this)">Overview</button>
+  <button data-tab="growth" onclick="showTab('growth',this)">Growth</button>
+  <button data-tab="gameplay" onclick="showTab('gameplay',this)">Gameplay</button>
+  <button data-tab="rooms" onclick="showTab('rooms',this)">Live Rooms</button>
+  <button data-tab="feedback" onclick="showTab('feedback',this)">Feedback</button>
 </nav>
 
 <main>
-  <!-- Tab A: Adoption over time -->
-  <div id="tab-adoption" class="panel active">
-    <div class="card">
-      <h2>Download &amp; Usage Overview</h2>
-      <div class="stat-row">
-        <div class="stat"><div class="label">GitHub Downloads</div><div class="value gh-count" id="gh-dl">—</div></div>
-        <div class="stat"><div class="label">Distinct Rooms Seen</div><div class="value" id="stat-rooms-seen">—</div></div>
-        <div class="stat"><div class="label">History Snapshots</div><div class="value" id="stat-snapshots">—</div></div>
-        <div class="stat"><div class="label">Peak Concurrent Rooms</div><div class="value" id="stat-peak">—</div></div>
-        <div class="stat"><div class="label">Currently Live</div><div class="value" id="stat-live">—</div></div>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Active Rooms &amp; Peak Players — Hourly</h2>
-      <div class="chart-wrap">
-        <canvas id="chart-adoption"></canvas>
-      </div>
-    </div>
+  <div id="tab-overview" class="panel active">
+    <div class="kpis" id="kpis"></div>
+    <div class="bento" id="bento"></div>
   </div>
+  <div id="tab-growth" class="panel"><div id="growth"></div></div>
+  <div id="tab-gameplay" class="panel"><div id="gameplay"></div></div>
 
-  <!-- Tab B: Live rooms x-ray -->
   <div id="tab-rooms" class="panel">
     <div class="note">
-      &#9888;&#65039; <strong>online_count</strong> in the registry is cached and can be stale — an idle or disconnected member's count may not update until they do something.
-      <strong>Trust last-activity age</strong> as the primary signal of whether a room is actually active.
-      Use <code>/party/&lt;CODE&gt;/debug</code> for a live socket count on a specific room.
+      &#9888;&#65039; <strong>online_count</strong> is cached and can be stale. <strong>Trust last-activity age</strong> as the primary signal.
+      Use <code>/party/&lt;CODE&gt;/debug</code> for a live socket count.
     </div>
     <div class="card" style="margin-top:12px">
       <h2>Live Parties (<span id="rooms-count">0</span>)</h2>
-      <div class="tbl-wrap">
-        <table id="rooms-table">
-          <thead><tr>
-            <th>Code</th><th>Members</th><th>Online*</th><th>Leader</th><th>Active Boss</th><th>Last Activity</th>
-          </tr></thead>
-          <tbody id="rooms-tbody"></tbody>
-        </table>
-      </div>
-      <div class="note" style="margin-top:8px">* online_count = cached registry value; may lag. See note above.</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Code</th><th>Members</th><th>Online*</th><th>Leader</th><th>Active Boss</th><th>Last Activity</th></tr></thead>
+        <tbody id="rooms-tbody"></tbody>
+      </table></div>
     </div>
   </div>
 
-  <!-- Tab C: Feedback inbox -->
   <div id="tab-feedback" class="panel">
-    <div class="card">
-      <h2>Feedback Reports (<span id="fb-count">0</span>)</h2>
-      <div id="fb-list"></div>
-    </div>
+    <div class="card"><h2>Feedback Reports (<span id="fb-count">0</span>)</h2><div id="fb-list"></div></div>
   </div>
 </main>
 
 <script>
 (function() {
   'use strict';
-
-  // Grab the key from this page's own URL (never hardcoded).
-  const pageUrl = new URL(location.href);
-  const KEY = pageUrl.searchParams.get('key') || '';
+  const KEY = new URL(location.href).searchParams.get('key') || '';
   const REFRESH_MS = 30_000;
   let refreshTimer = null;
+  let ghDownloads = null;
 
-  // ---------- tab switching ----------
   window.showTab = function(id, btn) {
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
     document.getElementById('tab-' + id).classList.add('active');
-    btn.classList.add('active');
+    if (btn) btn.classList.add('active');
+    else { const t = document.querySelector('nav.tabs button[data-tab="'+id+'"]'); if (t) t.classList.add('active'); }
   };
 
-  // ---------- status bar ----------
   function setStatus(ok, text) {
-    const bar = document.getElementById('status-bar');
-    bar.className = ok ? 'ok' : 'err';
+    document.getElementById('status-bar').className = ok ? 'ok' : 'err';
     document.getElementById('status-text').textContent = text;
   }
 
-  // ---------- main data load ----------
+  // ---------- inline zero-dep SVG chart toolkit ----------
+  const SVGChart = {
+    _empty(w, h) { return '<svg viewBox="0 0 '+w+' '+h+'" class="chart"><text x="'+(w/2)+'" y="'+(h/2)+'" class="svg-empty" text-anchor="middle">no data</text></svg>'; },
+    sparkline(points) {
+      const W=300,H=80,P=4; if(!points||!points.length) return this._empty(W,H);
+      const max=Math.max(1,...points), step=(W-2*P)/Math.max(1,points.length-1);
+      const pts=points.map((v,i)=>(P+i*step).toFixed(1)+','+(H-P-(v/max)*(H-2*P)).toFixed(1)).join(' ');
+      const area=P+','+(H-P)+' '+pts+' '+(W-P).toFixed(1)+','+(H-P);
+      return '<svg viewBox="0 0 '+W+' '+H+'" class="chart" preserveAspectRatio="none"><polygon points="'+area+'" class="spark-area"/><polyline points="'+pts+'" class="spark-line"/></svg>';
+    },
+    bars(items) {
+      const W=300,H=92,P=4,base=H-16; if(!items||!items.length) return this._empty(W,H);
+      const max=Math.max(1,...items.map(d=>d.value)), bw=(W-2*P)/items.length; let s='';
+      items.forEach((d,i)=>{ const h=(d.value/max)*(base-P), x=P+i*bw;
+        s+='<rect x="'+(x+bw*0.15).toFixed(1)+'" y="'+(base-h).toFixed(1)+'" width="'+(bw*0.7).toFixed(1)+'" height="'+h.toFixed(1)+'" class="bar"/>'
+         + '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-4)+'" class="svg-axis" text-anchor="middle">'+esc(d.label)+'</text>'; });
+      return '<svg viewBox="0 0 '+W+' '+H+'" class="chart">'+s+'</svg>';
+    },
+    topN(items) {
+      const rowH=20,W=300,P=2; if(!items||!items.length) return this._empty(W,80);
+      const H=items.length*rowH+P*2, max=Math.max(1,...items.map(d=>d.value)), barX=94, barMax=W-barX-36; let s='';
+      items.forEach((d,i)=>{ const y=P+i*rowH, bw=(d.value/max)*barMax;
+        s+='<text x="0" y="'+(y+14)+'" class="svg-label-l">'+esc(String(d.label).slice(0,13))+'</text>'
+         + '<rect x="'+barX+'" y="'+(y+4)+'" width="'+bw.toFixed(1)+'" height="12" class="bar-h"/>'
+         + '<text x="'+(barX+bw+4).toFixed(1)+'" y="'+(y+14)+'" class="svg-val">'+fmtNum(d.value)+'</text>'; });
+      return '<svg viewBox="0 0 '+W+' '+H+'" class="chart">'+s+'</svg>';
+    },
+    histogram(buckets) {
+      const W=300,H=90,P=4,base=H-4; if(!buckets||!buckets.length) return this._empty(W,H);
+      const mc=Math.max(1,...buckets.map(b=>b.count)), bw=(W-2*P)/buckets.length; let s='';
+      buckets.forEach((b,i)=>{ const h=(b.count/mc)*(base-P), x=P+i*bw;
+        s+='<rect x="'+x.toFixed(1)+'" y="'+(base-h).toFixed(1)+'" width="'+Math.max(1,bw-1).toFixed(1)+'" height="'+h.toFixed(1)+'" class="bar"/>'; });
+      return '<svg viewBox="0 0 '+W+' '+H+'" class="chart">'+s+'</svg>';
+    },
+    donut(slices) {
+      const W=120,H=120,cx=60,cy=60,r=44,sw=18; const total=(slices||[]).reduce((a,d)=>a+d.value,0);
+      if(!total) return this._empty(W,H); let a=-Math.PI/2,s='';
+      slices.forEach(d=>{ const frac=d.value/total, a2=a+frac*2*Math.PI;
+        const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2),large=frac>0.5?1:0;
+        s+='<path d="M '+x1.toFixed(1)+' '+y1.toFixed(1)+' A '+r+' '+r+' 0 '+large+' 1 '+x2.toFixed(1)+' '+y2.toFixed(1)+'" fill="none" stroke="'+d.color+'" stroke-width="'+sw+'"/>'; a=a2; });
+      return '<svg viewBox="0 0 '+W+' '+H+'" class="chart-donut">'+s+'</svg>';
+    }
+  };
+
+  // ---------- data load ----------
   async function load() {
     setStatus(true, 'Loading…');
     clearTimeout(refreshTimer);
     try {
-      // Fetch dashboard JSON from the same worker, passing the key.
       const res = await fetch('/dashboard.json?key=' + encodeURIComponent(KEY));
       if (!res.ok) { setStatus(false, 'HTTP ' + res.status); schedule(); return; }
       const data = await res.json();
-
-      renderAdoption(data);
-      renderRooms(data.live_rooms || []);
-      renderFeedback(data.feedback || []);
-
-      const d = new Date(data.generated_at);
-      setStatus(true, 'Updated ' + d.toLocaleTimeString() + ' · auto-refresh 30s');
-    } catch(e) {
-      setStatus(false, 'Error: ' + e.message);
-    }
+      fetchGhDownloads(() => {
+        renderOverview(data); renderGrowth(data);
+      });
+      renderOverview(data); renderGrowth(data); renderGameplay(data);
+      renderRooms(data.live_rooms || []); renderFeedback(data.feedback || []);
+      setStatus(true, 'Updated ' + new Date(data.generated_at).toLocaleTimeString() + ' · auto-refresh 30s');
+    } catch (e) { setStatus(false, 'Error: ' + e.message); }
     schedule();
   }
+  function schedule() { clearTimeout(refreshTimer); refreshTimer = setTimeout(load, REFRESH_MS); }
 
-  function schedule() {
-    clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(load, REFRESH_MS);
-  }
-
-  // ---------- Tab A: Adoption ----------
-  function renderAdoption(data) {
-    const history = data.history || [];
-    const liveRooms = data.live_rooms || [];
-
-    // Snapshot stats
-    const peakRooms = history.reduce((m, s) => Math.max(m, s.active_rooms || 0), 0);
-    document.getElementById('stat-rooms-seen').textContent = history.length;
-    document.getElementById('stat-snapshots').textContent = history.length;
-    document.getElementById('stat-peak').textContent = peakRooms;
-    document.getElementById('stat-live').textContent = liveRooms.length;
-
-    // Draw chart
-    drawAdoptionChart(history);
-
-    // GitHub download count (client-side fetch of public GH API — CORS-safe)
-    fetchGhDownloads();
-  }
-
-  // One-shot GH fetch; cached result for the tab session.
-  let ghFetched = false;
-  function fetchGhDownloads() {
-    if (ghFetched) return;
-    ghFetched = true;
+  function fetchGhDownloads(cb) {
+    if (ghDownloads !== null) { if (cb) cb(); return; }
     fetch('https://api.github.com/repos/stoopkid713/TL-DPS-Meter/releases', {
       headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
-    })
-    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
-    .then(releases => {
-      let total = 0;
-      for (const rel of releases) {
-        for (const asset of (rel.assets || [])) {
-          total += (asset.download_count || 0);
-        }
-      }
-      document.getElementById('gh-dl').textContent = total.toLocaleString();
-    })
-    .catch(err => {
-      document.getElementById('gh-dl').textContent = 'N/A';
-      console.warn('GH API:', err);
-    });
+    }).then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+      .then(rel => { let t = 0; rel.forEach(r => (r.assets||[]).forEach(a => t += (a.download_count||0))); ghDownloads = t; if (cb) cb(); })
+      .catch(() => { ghDownloads = 'N/A'; if (cb) cb(); });
   }
 
-  // Canvas chart — active rooms per hour (bar) + peak_players overlay (line).
-  // Uses the Canvas 2D API only — NO external chart libraries.
-  function drawAdoptionChart(history) {
-    const canvas = document.getElementById('chart-adoption');
-    if (!canvas) return;
+  // ---------- Overview ----------
+  function renderOverview(data) {
+    const a = data.analytics, hist = data.history || [], live = data.live_rooms || [];
+    const enc7 = a ? (a.encounters_per_day||[]).slice(-7).reduce((s,d)=>s+d.count,0) : 0;
+    const peak = hist.reduce((m,s)=>Math.max(m, s.active_rooms||0), 0);
+    const kpis = [
+      ['Live Now', live.length, ''],
+      ['Parties · 7d', a ? a.distinct_parties : '—', ''],
+      ['Encounters · 7d', a ? fmtNum(enc7) : '—', ''],
+      ['Downloads', ghDownloads==null?'…':(typeof ghDownloads==='number'?fmtNum(ghDownloads):ghDownloads), 'purple'],
+      ['Peak Rooms', peak, ''],
+    ];
+    document.getElementById('kpis').innerHTML = kpis.map(k =>
+      '<div class="kpi"><div class="label">'+k[0]+'</div><div class="value '+k[2]+'">'+k[1]+'</div></div>').join('');
 
-    // Size the canvas to its CSS pixel size.
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    const W = rect.width;
-    const H = rect.height;
-    const PAD = { top: 12, right: 20, bottom: 36, left: 36 };
-    const innerW = W - PAD.left - PAD.right;
-    const innerH = H - PAD.top - PAD.bottom;
-
-    // Background
-    ctx.fillStyle = '#161b22';
-    ctx.fillRect(0, 0, W, H);
-
-    if (!history.length) {
-      ctx.fillStyle = '#8b949e';
-      ctx.font = '12px ui-monospace,monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('No history yet — snapshots land at the top of each hour.', W/2, H/2);
-      return;
-    }
-
-    // Trim to last 72 data points (72 hours) for readability.
-    const pts = history.slice(-72);
-    const maxRooms = Math.max(1, ...pts.map(p => p.active_rooms || 0));
-
-    const barW = Math.max(2, innerW / pts.length - 2);
-
-    // Draw grid lines
-    ctx.strokeStyle = '#21262d';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = PAD.top + innerH - (i / 4) * innerH;
-      ctx.beginPath();
-      ctx.moveTo(PAD.left, y);
-      ctx.lineTo(PAD.left + innerW, y);
-      ctx.stroke();
-      // Y-axis labels
-      ctx.fillStyle = '#8b949e';
-      ctx.font = '10px ui-monospace,monospace';
-      ctx.textAlign = 'right';
-      ctx.fillText(Math.round((i / 4) * maxRooms), PAD.left - 4, y + 3);
-    }
-
-    // Draw bars (active_rooms)
-    pts.forEach((pt, i) => {
-      const x = PAD.left + i * (innerW / pts.length) + (innerW / pts.length - barW) / 2;
-      const pct = (pt.active_rooms || 0) / maxRooms;
-      const bH = Math.max(1, pct * innerH);
-      const y = PAD.top + innerH - bH;
-      ctx.fillStyle = '#1f6feb';
-      ctx.fillRect(x, y, barW, bH);
-    });
-
-    // X-axis: label every ~12 points
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '9px ui-monospace,monospace';
-    ctx.textAlign = 'center';
-    const labelStep = Math.max(1, Math.floor(pts.length / 8));
-    pts.forEach((pt, i) => {
-      if (i % labelStep !== 0) return;
-      const x = PAD.left + (i + 0.5) * (innerW / pts.length);
-      if (pt.ts) {
-        const d = new Date(pt.ts);
-        const label = (d.getMonth()+1) + '/' + d.getDate() + ' ' +
-          String(d.getHours()).padStart(2,'0') + 'h';
-        ctx.fillText(label, x, PAD.top + innerH + 14);
-      }
-    });
-
-    // Legend
-    ctx.fillStyle = '#1f6feb';
-    ctx.fillRect(PAD.left, PAD.top + innerH + 22, 10, 8);
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '9px ui-monospace,monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('active rooms / hour', PAD.left + 14, PAD.top + innerH + 30);
+    const epd = a ? (a.encounters_per_day||[]).map(d=>d.count) : [];
+    const bosses = a ? (a.top_bosses||[]).slice(0,4).map(b=>({label:b.boss,value:b.count})) : [];
+    const psize = a ? (a.party_size_dist||[]).map(d=>({label:String(d.size),value:d.count})) : [];
+    const q = a ? a.hit_quality : null;
+    const tiles = [];
+    tiles.push(tile('span2', 'Encounters / day · 30d', 'growth', '↗ GROWTH', SVGChart.sparkline(epd), 'growth'));
+    tiles.push(tile('', 'Top Bosses · 7d', 'game', '⚔ GAMEPLAY', SVGChart.topN(bosses), 'gameplay'));
+    tiles.push(tile('', 'Party Size', 'game', '⚔', SVGChart.bars(psize), 'gameplay'));
+    tiles.push(tile('', 'Hit Quality', 'game', '⚔',
+      q ? ('<div class="qline">Crit <b style="color:var(--green)">'+pct(q.crit_rate)+'</b></div>'
+         + '<div class="qline">Heavy <b style="color:var(--yellow)">'+pct(q.heavy_rate)+'</b></div>'
+         + '<div class="qline">Crit+Heavy <b style="color:var(--purple)">'+pct(q.crit_heavy_rate)+'</b></div>')
+        : '<div class="empty">no data</div>', 'gameplay'));
+    tiles.push(tile('', 'Live Rooms', 'ops', 'OPS',
+      live.length ? live.slice(0,3).map(r=>'<div class="mini"><code>'+esc(r.code||'?')+'</code> · '+(r.member_count||0)+'p · '+esc(r.active_boss||'—')+'</div>').join('')
+        : '<div class="empty">none live</div>', 'rooms'));
+    tiles.push(tile('', 'Feedback', 'fb', (data.feedback||[]).length+' total',
+      (data.feedback||[]).length ? (data.feedback||[]).slice(0,2).map(f=>'<div class="mini">'+badgeEmoji(f.type)+' '+esc((f.message||'').slice(0,46))+'</div>').join('')
+        : '<div class="empty">none</div>', 'feedback'));
+    tiles.push('<div class="tile pending"><div class="t-head">⏱ Fight Duration</div><div style="color:var(--yellow);font-size:.74rem">pending #56 — needs real fight start/end</div></div>');
+    document.getElementById('bento').innerHTML = tiles.join('');
+  }
+  function tile(extra, head, tagClass, tag, body, goTab) {
+    return '<div class="tile '+extra+'" onclick="showTab(\\''+goTab+'\\')">'
+      + '<div class="t-head"><span>'+head+'</span><span class="t-tag tag-'+tagClass+'">'+tag+'</span></div>'
+      + body + '</div>';
   }
 
-  // ---------- Tab B: Live Rooms ----------
+  // ---------- Growth ----------
+  function renderGrowth(data) {
+    const a = data.analytics, hist = data.history || [];
+    const epd = a ? (a.encounters_per_day||[]).map(d=>d.count) : [];
+    const rooms = hist.slice(-72).map(s=>({label:'', value:s.active_rooms||0}));
+    const dl = ghDownloads==null?'…':(typeof ghDownloads==='number'?fmtNum(ghDownloads):ghDownloads);
+    document.getElementById('growth').innerHTML =
+      '<div class="card"><h2>Encounters / day · 30d</h2>'+SVGChart.sparkline(epd)+'</div>'
+      + '<div class="grid2">'
+      +   '<div class="card"><h2>Distinct Parties · 7d</h2><div class="kpi"><div class="value">'+(a?a.distinct_parties:'—')+'</div></div></div>'
+      +   '<div class="card"><h2>GitHub Downloads</h2><div class="kpi"><div class="value purple">'+dl+'</div></div></div>'
+      + '</div>'
+      + '<div class="card"><h2>Active Rooms / hour · last 72h</h2>'+SVGChart.bars(rooms.length?rooms:[])+'</div>'
+      + '<div class="note">Time-of-day &amp; new-vs-returning need per-fight timing — pending #56.</div>';
+  }
+
+  // ---------- Gameplay ----------
+  function renderGameplay(data) {
+    const a = data.analytics;
+    if (!a) { document.getElementById('gameplay').innerHTML = '<div class="card"><div class="empty">No analytics data.</div></div>'; return; }
+    const bosses = (a.top_bosses||[]).map(b=>({label:b.boss,value:b.count}));
+    const psize = (a.party_size_dist||[]).map(d=>({label:String(d.size),value:d.count}));
+    const q = a.hit_quality;
+    const donut = q ? SVGChart.donut([
+      {label:'Crit', value:q.crit_rate, color:'#3fb950'},
+      {label:'Heavy', value:q.heavy_rate, color:'#d29922'},
+      {label:'Other', value:Math.max(0,1-q.crit_rate-q.heavy_rate), color:'#30363d'},
+    ]) : '<div class="empty">no data</div>';
+    const mix = (a.content_mix||[]).slice(0,8).map(c=>'<tr><td>'+esc(c.content_type||'—')+'</td><td>'+esc(c.content_tier||'—')+'</td><td>'+fmtNum(c.count)+'</td></tr>').join('')
+      || '<tr><td colspan="3" class="empty">no data</td></tr>';
+    document.getElementById('gameplay').innerHTML =
+      '<div class="grid2">'
+      +   '<div class="card"><h2>Top Bosses · 7d</h2>'+SVGChart.topN(bosses)+'</div>'
+      +   '<div class="card"><h2>Boss Damage Distribution</h2>'+SVGChart.histogram((a.damage_dist||{}).buckets)+'</div>'
+      +   '<div class="card"><h2>Party Size</h2>'+SVGChart.bars(psize)+'</div>'
+      +   '<div class="card"><h2>Hit Quality</h2>'+donut+'</div>'
+      + '</div>'
+      + '<div class="card"><h2>Content Mix · 7d</h2><table><thead><tr><th>Type</th><th>Tier</th><th>Count</th></tr></thead><tbody>'+mix+'</tbody></table></div>';
+  }
+
+  // ---------- Live Rooms ----------
   function renderRooms(rooms) {
     document.getElementById('rooms-count').textContent = rooms.length;
     const tbody = document.getElementById('rooms-tbody');
-    if (!rooms.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty">No active parties right now.</td></tr>';
-      return;
-    }
+    if (!rooms.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No active parties right now.</td></tr>'; return; }
     const now = Date.now();
     tbody.innerHTML = rooms.map(r => {
-      const ageSec = r.last_activity ? Math.floor((now - r.last_activity) / 1000) : null;
-      const ageStr = ageSec === null ? '—' : fmtAge(ageSec);
-      const ageClass = ageSec === null ? '' : ageSec < 120 ? 'age-ok' : ageSec < 600 ? 'age-warn' : 'age-stale';
-      const boss = r.active_boss || '—';
-      return '<tr>' +
-        '<td><code>' + esc(r.code || '?') + '</code></td>' +
-        '<td>' + (r.member_count || 0) + '</td>' +
-        '<td>' + (r.online_count || 0) + '</td>' +
-        '<td>' + esc(r.leader || '—') + '</td>' +
-        '<td>' + esc(boss) + '</td>' +
-        '<td class="' + ageClass + '">' + ageStr + '</td>' +
-        '</tr>';
+      const ageSec = r.last_activity ? Math.floor((now - r.last_activity)/1000) : null;
+      const ageStr = ageSec===null ? '—' : fmtAge(ageSec);
+      const ageClass = ageSec===null ? '' : ageSec<120 ? 'age-ok' : ageSec<600 ? 'age-warn' : 'age-stale';
+      return '<tr><td><code>'+esc(r.code||'?')+'</code></td><td>'+(r.member_count||0)+'</td><td>'+(r.online_count||0)+'</td><td>'+esc(r.leader||'—')+'</td><td>'+esc(r.active_boss||'—')+'</td><td class="'+ageClass+'">'+ageStr+'</td></tr>';
     }).join('');
   }
 
-  // ---------- Tab C: Feedback ----------
+  // ---------- Feedback ----------
   function renderFeedback(items) {
     document.getElementById('fb-count').textContent = items.length;
     const list = document.getElementById('fb-list');
-    if (!items.length) {
-      list.innerHTML = '<div class="empty">No feedback reports yet.</div>';
-      return;
-    }
+    if (!items.length) { list.innerHTML = '<div class="empty">No feedback reports yet.</div>'; return; }
     list.innerHTML = items.map(fb => {
       const type = fb.type || 'feedback';
-      const badgeClass = type === 'bug' ? 'badge-bug' : type === 'idea' ? 'badge-idea' : 'badge-fb';
-      const ctx = fb.context || {};
-      const ctxParts = [];
-      if (ctx.app_version) ctxParts.push('v' + esc(ctx.app_version));
-      if (ctx.screen) ctxParts.push('screen:' + esc(ctx.screen));
-      if (fb.ua) ctxParts.push('ua:' + esc((fb.ua || '').slice(0, 80)));
-      return '<div class="feedback-card">' +
-        '<div class="meta">' +
-          '<span class="badge ' + badgeClass + '">' + esc(type) + '</span>' +
-          '<span>' + esc(fb.ts || '') + '</span>' +
-          (ctxParts.length ? '<span>' + ctxParts.join(' · ') + '</span>' : '') +
-        '</div>' +
-        '<div class="msg">' + esc(fb.message || '') + '</div>' +
-        (ctxParts.length ? '<div class="ctx">' + ctxParts.join(' &nbsp;·&nbsp; ') + '</div>' : '') +
-        '</div>';
+      const badgeClass = type==='bug' ? 'badge-bug' : type==='idea' ? 'badge-idea' : 'badge-fb';
+      const ctx = fb.context || {}, parts = [];
+      if (ctx.app_version) parts.push('v'+esc(ctx.app_version));
+      if (ctx.screen) parts.push('screen:'+esc(ctx.screen));
+      return '<div class="feedback-card"><div class="meta"><span class="badge '+badgeClass+'">'+esc(type)+'</span><span>'+esc(fb.ts||'')+'</span>'
+        + (parts.length?'<span>'+parts.join(' · ')+'</span>':'') + '</div><div class="msg">'+esc(fb.message||'')+'</div></div>';
     }).join('');
   }
 
   // ---------- helpers ----------
-  function fmtAge(sec) {
-    if (sec < 60) return sec + 's ago';
-    if (sec < 3600) return Math.floor(sec / 60) + 'm ago';
-    return Math.floor(sec / 3600) + 'h ago';
-  }
+  function fmtAge(s) { if(s<60) return s+'s ago'; if(s<3600) return Math.floor(s/60)+'m ago'; return Math.floor(s/3600)+'h ago'; }
+  function fmtNum(n) { n = Number(n)||0; if(n>=1e9) return (n/1e9).toFixed(1)+'B'; if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1e3) return (n/1e3).toFixed(1)+'k'; return String(n); }
+  function pct(x) { return Math.round((Number(x)||0)*100)+'%'; }
+  function badgeEmoji(t) { return t==='bug'?'🐛':t==='idea'?'💡':'💬'; }
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  window.esc = esc; window.fmtNum = fmtNum;
 
-  function esc(s) {
-    return String(s)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
-  }
-
-  // ---------- boot ----------
   window.load = load;
   load();
 })();
