@@ -123,6 +123,16 @@ into full dungeon runs with boss detection and run summaries.
 
 ---
 
+## 🗺️ Roadmap
+
+[![STOOP roadmap — Now, Next, Later](https://stoopkid713.github.io/STOOP/img/roadmap.png)](https://stoopkid713.github.io/STOOP/roadmap.html)
+
+Where we're headed — we earn **trust** (accuracy &amp; setup) first, then add **depth**, then
+**reach**. Full text in [`docs/ROADMAP.md`](docs/ROADMAP.md); priorities shift with your feedback
+in the Discord `#suggestions` channel. *A direction, not a promise of dates.*
+
+---
+
 ## Enable Combat Logging
 
 1. **Settings → Shortcuts → Ring Menu Settings**
