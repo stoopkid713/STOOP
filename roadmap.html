@@ -1,0 +1,116 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>STOOP — Roadmap</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg1:#080C14; --bg2:#090E1A; --panel:rgba(255,255,255,.03); --panel2:rgba(255,255,255,.018);
+  --br:rgba(148,163,184,.16); --br2:rgba(148,163,184,.10);
+  --ink:#E2E8F0; --dim:#94A3B8; --faint:#64748B;
+  --terra:#D96444; --terra2:#B5492E; --glow:rgba(217,100,68,.5);
+  --gold:#D6A64E; --gold2:#B5863A;
+  --disp:'Bebas Neue','Segoe UI',sans-serif;
+  --body:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+html,body{background:var(--bg2)}
+.canvas{position:relative;width:1200px;min-height:632px;overflow:hidden;
+  background:radial-gradient(1050px 540px at 84% -12%, rgba(217,100,68,.18), transparent 56%),
+             radial-gradient(760px 520px at 52% -10%, rgba(214,166,78,.09), transparent 58%),
+             linear-gradient(160deg,var(--bg1),var(--bg2));
+  font-family:var(--body);color:var(--ink);padding:46px 56px 34px;}
+.grid-tex{position:absolute;inset:0;opacity:.5;pointer-events:none;
+  background-image:linear-gradient(var(--br2) 1px,transparent 1px),linear-gradient(90deg,var(--br2) 1px,transparent 1px);
+  background-size:48px 48px;mask-image:radial-gradient(900px 520px at 80% 0%,#000,transparent 70%);}
+.head{position:relative;display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px}
+.eyebrow{font-family:var(--disp);letter-spacing:.42em;font-size:16px;color:var(--terra);margin-bottom:2px}
+.word{font-family:var(--disp);font-size:70px;line-height:.82;letter-spacing:.06em;color:var(--ink)}
+.word b{color:var(--terra);font-weight:400}
+.tag{color:var(--dim);font-size:14px;margin-top:10px}
+.head-r{text-align:right;padding-top:6px}
+.game{font-family:var(--disp);letter-spacing:.26em;font-size:14px;color:var(--faint)}
+.pill{display:inline-flex;align-items:center;gap:8px;margin-top:11px;padding:6px 13px;border-radius:999px;
+  background:rgba(217,100,68,.12);border:1px solid rgba(217,100,68,.34);color:var(--terra);
+  font-size:12px;letter-spacing:.16em;font-family:var(--disp)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--terra);box-shadow:0 0 10px 2px var(--glow)}
+.cols{position:relative;display:grid;grid-template-columns:1fr 1fr 1fr;gap:26px}
+.chip{display:flex;align-items:baseline;gap:12px;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid var(--br2)}
+.chip .lab{font-family:var(--disp);font-size:29px;letter-spacing:.06em}
+.chip .sub{font-size:11.5px;color:var(--faint);letter-spacing:.04em;text-transform:uppercase}
+.col.now .lab{color:var(--terra)} .col.next .lab{color:var(--gold)} .col.later .lab{color:var(--dim)}
+.col.now .chip{border-bottom-color:rgba(217,100,68,.4)} .col.next .chip{border-bottom-color:rgba(214,166,78,.32)}
+.rmeter{margin-bottom:15px}
+.rrow{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+.rnum{font-family:var(--disp);font-size:22px;line-height:1;color:var(--terra);width:25px;letter-spacing:.03em;opacity:.82}
+.rrow svg{width:18px;height:18px;color:var(--terra);flex:none}
+.rrow .t{font-size:14.5px;color:var(--ink);flex:1}
+.rrow .pct{font-family:var(--disp);font-size:18px;color:var(--terra);letter-spacing:.03em}
+.rtrack{height:8px;border-radius:6px;background:rgba(255,255,255,.05);overflow:hidden;margin-left:36px}
+.rfill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--terra2),var(--terra));box-shadow:0 0 12px 1px var(--glow)}
+.item{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:10px;border-radius:11px;
+  background:var(--panel);border:1px solid var(--br2)}
+.item svg{width:18px;height:18px;flex:none;color:var(--dim)}
+.item .t{font-size:14.5px;color:var(--ink)}
+.col.next .item{border-color:rgba(214,166,78,.2)} .col.next .item svg{color:var(--gold)}
+.col.later .item{background:var(--panel2)} .col.later .item .t{color:var(--dim)} .col.later .item svg{color:var(--faint)}
+.foot{position:relative;display:flex;justify-content:space-between;align-items:center;
+  margin-top:26px;padding-top:16px;border-top:1px solid var(--br2);color:var(--faint);font-size:12.5px}
+.foot .r{color:var(--dim)} .foot b{color:var(--terra);font-weight:400}
+</style>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="i-rec" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 3-4.8 5.5-4.8s4.9 1.6 5.5 4.8"/><path d="M16 5.2a3 3 0 0 1 0 5.6M17.5 14.6c1.9.5 3.3 1.9 3.8 4.4"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l1.8 4.9 4.9 1.8-4.9 1.8L12 17l-1.8-5-4.9-1.8 4.9-1.8z"/><path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+<symbol id="i-cast" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M5 9a10 10 0 0 1 10 10M5 13a6 6 0 0 1 6 6"/><circle cx="5.5" cy="18.5" r="1.4" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l7 2.5v5c0 4.5-3 8-7 9.5-4-1.5-7-5-7-9.5v-5z"/><path d="M9 12l2 2 4-4.2" stroke-linecap="round"/></symbol>
+<symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="18" cy="18" r="2.4"/><path d="M8.1 10.9l7.8-3.8M8.1 13.1l7.8 3.8"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 20V10M10 20V5M16 20v-7M22 20H2"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M13 3L5 13h5l-1 8 8-10h-5z"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 5H5v1a3 3 0 0 0 3 3M16 5h3v1a3 3 0 0 1-3 3M10 13.5h4M9 20h6M12 13.5V16"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 5h16v11H9l-4 3.5V16H4z"/></symbol>
+</defs></svg>
+
+<div class="canvas">
+  <div class="grid-tex"></div>
+  <div class="head">
+    <div>
+      <div class="eyebrow">ROADMAP</div>
+      <div class="word">STO<b>O</b>P</div>
+      <div class="tag">Party DPS &amp; build-testing for Throne and Liberty — free &amp; open source.</div>
+    </div>
+    <div class="head-r">
+      <div class="game">THRONE&nbsp;&amp;&nbsp;LIBERTY</div>
+      <div class="pill"><span class="dot"></span> NOW SHIPPING</div>
+    </div>
+  </div>
+  <div class="cols">
+    <div class="col now">
+      <div class="chip"><span class="lab">NOW</span><span class="sub">trust &amp; first value</span></div>
+      <div class="rmeter"><div class="rrow"><span class="rnum">01</span><svg><use href="#i-rec"/></svg><span class="t">Reliable recording</span><span class="pct">72%</span></div><div class="rtrack"><div class="rfill" style="width:72%"></div></div></div>
+      <div class="rmeter"><div class="rrow"><span class="rnum">02</span><svg><use href="#i-cast"/></svg><span class="t">Steadier parties &amp; overlay</span><span class="pct">63%</span></div><div class="rtrack"><div class="rfill" style="width:63%"></div></div></div>
+      <div class="rmeter"><div class="rrow"><span class="rnum">03</span><svg><use href="#i-users"/></svg><span class="t">Accurate party totals</span><span class="pct">58%</span></div><div class="rtrack"><div class="rfill" style="width:58%"></div></div></div>
+      <div class="rmeter"><div class="rrow"><span class="rnum">04</span><svg><use href="#i-spark"/></svg><span class="t">Effortless setup</span><span class="pct">44%</span></div><div class="rtrack"><div class="rfill" style="width:44%"></div></div></div>
+    </div>
+    <div class="col next">
+      <div class="chip"><span class="lab">NEXT</span><span class="sub">depth &amp; less friction</span></div>
+      <div class="item"><svg><use href="#i-shield"/></svg><span class="t">Signed installer</span></div>
+      <div class="item"><svg><use href="#i-share"/></svg><span class="t">One-click share</span></div>
+      <div class="item"><svg><use href="#i-target"/></svg><span class="t">Per-target breakdown</span></div>
+      <div class="item"><svg><use href="#i-chart"/></svg><span class="t">Deeper analytics</span></div>
+      <div class="item"><svg><use href="#i-bolt"/></svg><span class="t">Accuracy &amp; crit stats</span></div>
+    </div>
+    <div class="col later">
+      <div class="chip"><span class="lab">LATER</span><span class="sub">reach &amp; polish</span></div>
+      <div class="item"><svg><use href="#i-trophy"/></svg><span class="t">Public leaderboards</span></div>
+      <div class="item"><svg><use href="#i-eye"/></svg><span class="t">Spectator mode</span></div>
+      <div class="item"><svg><use href="#i-spark"/></svg><span class="t">Desktop polish</span></div>
+      <div class="item"><svg><use href="#i-msg"/></svg><span class="t">Community tools</span></div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>A direction, not a promise of dates.</span>
+    <span class="r">Ideas &amp; requests → <b>Discord #suggestions</b></span>
+  </div>
+</div>
