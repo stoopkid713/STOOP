@@ -178,13 +178,18 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
             
+            // Activate the pane by id directly. The config tabs (skillSettings,
+            // skillAssign, targetAssign, log) no longer have a [data-tab] chip
+            // since they moved into Settings -> Configuration, so gating pane
+            // activation on the chip left them unreachable (#66). The chip is
+            // now optional: highlight it only when one still exists.
+            const pane = document.getElementById('tab-' + tabName);
+            if (pane) {
+                pane.classList.add('active');
+            }
             const tab = document.querySelector(`[data-tab="${tabName}"]`);
             if (tab) {
                 tab.classList.add('active');
-                const pane = document.getElementById('tab-' + tabName);
-                if (pane) {
-                    pane.classList.add('active');
-                }
             }
         }
 

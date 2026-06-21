@@ -24,9 +24,10 @@
         }
 
         function switchTab(tabName) {
-            // Find and click the tab
-            const tab = document.querySelector(`[data-tab="${tabName}"]`);
-            if (tab) tab.click();
+            // Delegate to switchToTab so the Data Health cards reach config panes
+            // that no longer have a [data-tab] chip (#66). Old behaviour relied on
+            // clicking the chip, which silently no-op'd once it was removed.
+            switchToTab(tabName);
         }
 
         function updateDashboard() {
