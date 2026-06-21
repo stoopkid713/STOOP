@@ -201,3 +201,44 @@ def test_get_suggested_names_dominant_caster_from_log(tmp_path):
     res = srv._h_get_suggested_names(_NameStub(player_name="", log_dir=tmp_path), {})
     assert res["names"], "expected a suggested name from the log"
     assert res["names"][0] == "BigDPS"  # highest total-damage caster wins
+
+
+# --- saved-run IDs are unique (#22) ----------------------------------------
+def test_save_run_ids_are_unique(tmp_path):
+    """Two runs saved in the same wall-clock second must get distinct ids.
+
+    Regression (#22): run_id was strftime('%Y%m%d_%H%M%S') at 1s resolution with
+    no dedup, so back-to-back saves collided on one id.
+    """
+    import persistence as p
+
+    server = srv.DPSMeterServer(tmp_path, port=0)
+    r1 = srv._h_save_run(server, {"run_name": "A"})
+    r2 = srv._h_save_run(server, {"run_name": "B"})
+    assert r1["run_id"] != r2["run_id"]
+
+    ids = [r["id"] for r in p.load_saved_runs(str(tmp_path))]
+    assert len(ids) == len(set(ids)) == 2  # both persisted, no collision
+
+
+# --- update_encounter on a bad id errors, no phantom write (#27) ------------
+def test_update_encounter_bad_id_errors_without_save(tmp_path, monkeypatch):
+    """Updating a non-existent encounter id returns an error and does NOT write.
+
+    Regression (#27): the handler returned ``encounter: null`` (looks like a
+    success) AND still re-saved the file even though nothing matched.
+    """
+    import persistence as p
+
+    server = srv.DPSMeterServer(tmp_path, port=0)
+    saved = {"n": 0}
+    real_save = p.save_encounters
+    def _counting_save(data, data_dir):
+        saved["n"] += 1
+        return real_save(data, data_dir)
+    monkeypatch.setattr(p, "save_encounters", _counting_save)
+
+    res = srv._h_update_encounter(server, {"encounter_id": "does-not-exist", "notes": "x"})
+    assert res["type"] == "error"          # not a phantom "encounter_updated"
+    assert res.get("encounter") is None
+    assert saved["n"] == 0                  # no no-op write on a miss

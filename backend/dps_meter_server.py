@@ -825,6 +825,11 @@ def _h_update_encounter(s: DPSMeterServer, msg: dict) -> dict:
             e.update(fields)
             updated = e
             break
+    if updated is None:
+        # Bad/unknown id: don't write the file back and don't return a null
+        # encounter dressed up as success (#27).
+        return {"type": "error", "message": f"encounter not found: {enc_id}",
+                "encounter": None}
     p.save_encounters(data, s.data_dir)
     return {"type": "encounter_updated", "encounter": updated}
 
@@ -864,7 +869,9 @@ def _h_save_run(s: DPSMeterServer, msg: dict) -> dict:
     #   personal bests are a SEPARATE future worker (KV vs D1 decided at Phase 4). The party-room
     #   Durable Object NEVER holds global/cross-room data; do not wire leaderboards into it.
     runs = p.load_saved_runs(s.data_dir)
-    run_id = time.strftime("%Y%m%d_%H%M%S")
+    # Keep the sortable timestamp prefix, add a uuid suffix so two runs saved in
+    # the same wall-clock second can't collide on one id (#22).
+    run_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
     run = {
         "id": run_id,
         "run_name": msg.get("run_name", ""),
