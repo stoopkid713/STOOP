@@ -242,3 +242,34 @@ def test_update_encounter_bad_id_errors_without_save(tmp_path, monkeypatch):
     assert res["type"] == "error"          # not a phantom "encounter_updated"
     assert res.get("encounter") is None
     assert saved["n"] == 0                  # no no-op write on a miss
+
+
+# --- load_encounter_data freezes the live merge (#20) ----------------------
+def test_load_encounter_data_freezes_live_buffer(tmp_path, monkeypatch):
+    """Loading a saved encounter must STOP the watcher from merging new live hits into the
+    loaded historical buffer.
+
+    Regression (#20): the handler replaced s.stats with the viewed encounter's hits but never
+    updated reset_after_timestamp, so the watcher kept folding live combat into that buffer —
+    corrupting the live view (and any follow-up save). The fix mirrors _h_reset: set the cutoff
+    to now and skip the file backlog.
+    """
+    server = srv.DPSMeterServer(tmp_path, port=0)
+    assert server.reset_after_timestamp is None          # nothing frozen yet
+
+    monkeypatch.setattr(server, "_active_log_file", lambda: tmp_path / "log.txt")
+    monkeypatch.setattr(srv.encounter_scan, "parse_encounter_details",
+                        lambda *a, **k: {"dps": 1, "total_damage": 30})
+    monkeypatch.setattr(srv.encounter_scan, "parse_encounter_hits", lambda *a, **k: [])
+
+    class _FakeWatcher:
+        def __init__(self): self.skipped = False
+        def skip_to_end(self): self.skipped = True
+    server.watcher = _FakeWatcher()
+
+    res = srv._h_load_encounter_data(
+        server, {"target_name": "Boss", "start_time": "2026-05-30T17:00:00"})
+
+    assert res["type"] == "encounter_loaded"
+    assert server.reset_after_timestamp is not None       # cutoff now set -> live merge frozen
+    assert server.watcher.skipped is True                 # file backlog skipped, like _h_reset

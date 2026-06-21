@@ -726,6 +726,14 @@ def _h_load_encounter_data(s: DPSMeterServer, msg: dict) -> dict:
     s.stats.reset()
     for h in hits:
         s.stats.add_hit(h)
+    # Freeze the live merge. Without this the watcher keeps folding NEW live hits into the
+    # loaded historical buffer, corrupting the view (and any follow-up save). Loading a saved
+    # encounter is a view/save action, not "resume recording", so set the cutoff to now and
+    # skip the file backlog — exactly as _h_reset does. (#20)
+    s.reset_after_timestamp = datetime.now()
+    w = getattr(s, "watcher", None)
+    if w is not None:
+        w.skip_to_end()
     return {"type": "encounter_loaded", "data": details}
 
 
