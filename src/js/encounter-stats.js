@@ -866,14 +866,16 @@
             // Append new hits to the full session log (never cleared by reset)
             const newHits = hits || [];
             
+            // Dedup key includes sub-second relative_time so multiple AoE/multi-hit
+            // ticks in the same second (same skill+damage+target) aren't collapsed
+            // into one — they were being dropped from the combat log / CSV export (#26).
+            const hitKey = h => `${h.time}_${Number(h.relative_time||0).toFixed(1)}_${h.skill}_${h.damage}_${h.target}`;
             // Create a set of existing hit keys for fast lookup
-            const existingKeys = new Set(fullSessionLog.map(h => 
-                `${h.time}_${h.skill}_${h.damage}_${h.target}`
-            ));
-            
+            const existingKeys = new Set(fullSessionLog.map(hitKey));
+
             // Add only new hits
             newHits.forEach(hit => {
-                const key = `${hit.time}_${hit.skill}_${hit.damage}_${hit.target}`;
+                const key = hitKey(hit);
                 if (!existingKeys.has(key)) {
                     fullSessionLog.push(hit);
                     existingKeys.add(key);

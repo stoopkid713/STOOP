@@ -9,6 +9,12 @@
             const toggles = document.getElementById(togglesId);
             const legend  = document.getElementById(legendId);
             if (!chart) return;
+            // Empty rotation -> Math.min(...[])/Math.max(...[]) yield Infinity
+            // for firstHit/lastHit below (#28). Bail with a placeholder instead.
+            if (!rotation || rotation.length === 0) {
+                chart.innerHTML = '<div class="no-data" style="width: 100%;">No rotation data yet</div>';
+                return;
+            }
 
             const skillDmgTotals = {};
             rotation.forEach(h => { const sk=h.skill||'Unknown'; skillDmgTotals[sk]=(skillDmgTotals[sk]||0)+(h.damage||0); });
@@ -54,7 +60,7 @@
             }).join('');
 
             const numBars = Math.min(maxSec+1,120);
-            for (let i=0; i<=numBars; i++) {
+            for (let i=0; i<numBars; i++) {  // was i<=numBars -> one extra trailing bar (#28)
                 const sec=Math.floor(i*(maxSec/numBars));
                 const totalDmg=secDmgAll[sec]||0;
                 const isGap=totalDmg===0&&sec>=firstHit&&sec<=lastHit;
