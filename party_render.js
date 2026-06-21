@@ -144,26 +144,33 @@ const PartyRender = {
     return list;
   },
 
-  // 60s rotation stats (port of the solo ``calculateRotationStats``) — self-contained.
+  // Full-fight rotation stats (port of the solo ``calculateRotationStats``) — self-contained.
+  // The window spans the WHOLE fight (floored at 60s so short fights are byte-identical); TL
+  // bosses run 3-15 min and were silently truncated at 60s before. (#17)
   rotationStats(rotation) {
     if (!rotation || !rotation.length) return null;
-    const dps = {};
-    for (let i = 0; i <= 60; i++) dps[i] = 0;
+    const first = Math.floor((rotation[0] && rotation[0].relative_time) || 0);
+    let last = first;
     rotation.forEach((h) => {
       const s = Math.floor((h && h.relative_time) || 0);
-      if (s >= 0 && s <= 60) dps[s] += Number(h && h.damage) || 0;
+      if (s > last) last = s;
     });
-    const first = Math.floor((rotation[0] && rotation[0].relative_time) || 0);
-    const last = Math.floor((rotation[rotation.length - 1] && rotation[rotation.length - 1].relative_time) || 0);
+    const windowSec = Math.max(60, last);
+    const dps = {};
+    for (let i = 0; i <= windowSec; i++) dps[i] = 0;
+    rotation.forEach((h) => {
+      const s = Math.floor((h && h.relative_time) || 0);
+      if (s >= 0 && s <= windowSec) dps[s] += Number(h && h.damage) || 0;
+    });
     let peak = 0;
-    for (let i = 0; i <= 55; i++) {
+    for (let i = 0; i <= windowSec - 5; i++) {
       let sum = 0;
       for (let j = i; j < i + 5; j++) sum += dps[j] || 0;
       if (sum / 5 > peak) peak = sum / 5;
     }
     const active = Object.keys(dps).filter((i) => dps[i] > 0 && +i >= first && +i <= last).length;
     const totalSec = Math.max(1, last - first + 1);
-    return { dpsPerSecond: dps, peakDps: peak, activityRate: active / totalSec * 100, firstHitTime: first, lastHitTime: last };
+    return { dpsPerSecond: dps, peakDps: peak, activityRate: active / totalSec * 100, firstHitTime: first, lastHitTime: last, windowSec: windowSec };
   },
 
   // Skill-table HTML for a member's rotation. ``opts.compact`` => overlay variant.
@@ -313,26 +320,41 @@ const PartyRender = {
     return header + table;
   },
 
-  // Rotation chart HTML (61 one-second bars, 0..60s). ``opts.compact`` => overlay variant.
+  // Rotation chart HTML — up to 61 bars spanning the FULL fight (one-second bars for <=60s, then
+  // bucketed so long TL fights stay readable instead of being cut off at 60s). The axis labels
+  // scale to the real fight length. ``opts.compact`` => overlay variant. (#17)
   rotationChartHtml(rotation, opts) {
     opts = opts || {};
     const stats = PartyRender.rotationStats(rotation);
     if (!stats) return '<div class="pr-empty">No rotation data</div>';
+    const windowSec = stats.windowSec || 60;
+    const bucketSec = Math.max(1, Math.ceil((windowSec + 1) / 61));
+    const nBars = Math.ceil((windowSec + 1) / bucketSec);
+    const buckets = new Array(nBars).fill(0);
+    for (let i = 0; i <= windowSec; i++) buckets[Math.floor(i / bucketSec)] += stats.dpsPerSecond[i] || 0;
     let max = 1;
-    for (let i = 0; i <= 60; i++) { if ((stats.dpsPerSecond[i] || 0) > max) max = stats.dpsPerSecond[i]; }
+    for (let b = 0; b < nBars; b++) { if (buckets[b] > max) max = buckets[b]; }
+    const firstBucket = Math.floor(stats.firstHitTime / bucketSec);
+    const lastBucket = Math.floor(stats.lastHitTime / bucketSec);
     let bars = '';
-    for (let i = 0; i <= 60; i++) {
-      const d = stats.dpsPerSecond[i] || 0;
+    for (let b = 0; b < nBars; b++) {
+      const d = buckets[b];
       const h = max > 0 ? (d / max * 100) : 0;
       let cls = 'normal';
-      if (d === 0 && i >= stats.firstHitTime && i <= stats.lastHitTime) cls = 'gap';
+      if (d === 0 && b >= firstBucket && b <= lastBucket) cls = 'gap';
       bars += '<div class="pr-rot-bar ' + cls + '" style="height:' + Math.max(h, 1) + '%"></div>';
     }
+    const axisAt = (frac) => {
+      const s = Math.round(windowSec * frac);
+      // Short fights (<=60s, the floor) stay in plain seconds — byte-identical to the old axis.
+      if (windowSec <= 60) return s + 's';
+      return s >= 60 ? (Math.floor(s / 60) + 'm' + (s % 60 ? ' ' + (s % 60) + 's' : '')) : (s + 's');
+    };
     return '<div class="pr-rot">'
       + '<div class="pr-rot-meta">Activity ' + stats.activityRate.toFixed(0) + '% · Peak 5s '
         + PartyRender.fmtNum(Math.round(stats.peakDps)) + '</div>'
       + '<div class="pr-rot-chart' + (opts.compact ? ' compact' : '') + '">' + bars + '</div>'
-      + '<div class="pr-rot-axis"><span>0s</span><span>15s</span><span>30s</span><span>45s</span><span>60s</span></div>'
+      + '<div class="pr-rot-axis"><span>0s</span><span>' + axisAt(0.25) + '</span><span>' + axisAt(0.5) + '</span><span>' + axisAt(0.75) + '</span><span>' + axisAt(1) + '</span></div>'
       + '</div>';
   },
 

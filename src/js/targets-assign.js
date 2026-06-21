@@ -936,7 +936,7 @@
                                                 <div style="text-align: right;">
                                                     <div style="color: ${color}; font-size: 0.85rem; font-weight: 600;">${(enc.total_damage / 1000000).toFixed(2)}M</div>
                                                 </div>
-                                                <button onclick="event.stopPropagation(); removeFromRun(${originalIdx})" style="padding: 3px 6px; background: rgba(239, 68, 68, 0.7); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.6rem;">✕</button>
+                                                <button onclick="event.stopPropagation(); removeFromRun('${enc.start_time}')" style="padding: 3px 6px; background: rgba(239, 68, 68, 0.7); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.6rem;">✕</button>
                                             </div>
                                         </div>
                         `;
@@ -990,7 +990,7 @@
                                 <div style="width: calc(50% - 30px); padding-right: 20px;">
                                     <div style="background: linear-gradient(135deg, rgba(29, 47, 80, 0.95) 0%, rgba(21, 32, 53, 0.95) 100%); border: 2px solid ${cardColor}; border-radius: 12px; padding: 16px; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), 0 0 30px rgba(${cardRgb}, 0.15); position: relative;">
                                         <!-- Remove button -->
-                                        <button onclick="removeFromRun(${idx})" style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.65rem; font-weight: 700;">✕</button>
+                                        <button onclick="removeFromRun('${enc.start_time}')" style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(239, 68, 68, 0.8); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.65rem; font-weight: 700;">✕</button>
                                         
                                         <!-- Header with icon and name -->
                                         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
@@ -1024,7 +1024,7 @@
                                         </div>
                                         
                                         <!-- Attempt toggle -->
-                                        <button class="attempt-toggle ${isAttempt ? 'active' : ''}" onclick="toggleRunAttemptFlag(${idx})" style="width: 100%; padding: 6px;">
+                                        <button class="attempt-toggle ${isAttempt ? 'active' : ''}" onclick="toggleRunAttemptFlag('${enc.start_time}')" style="width: 100%; padding: 6px;">
                                             ${isAttempt ? '✓ Marked as Attempt (wipe/reset)' : '⚑ Mark as Attempt'}
                                         </button>
                                         
@@ -1088,7 +1088,7 @@
                                         </div>
                                         <div style="display: flex; align-items: center; gap: 8px;">
                                             <span style="color: ${color}; font-size: 0.8rem; font-weight: 600;">${(enc.total_damage / 1000).toFixed(0)}K</span>
-                                            <button onclick="removeFromRun(${idx})" style="padding: 2px 5px; background: rgba(239, 68, 68, 0.6); color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.55rem;">✕</button>
+                                            <button onclick="removeFromRun('${enc.start_time}')" style="padding: 2px 5px; background: rgba(239, 68, 68, 0.6); color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 0.55rem;">✕</button>
                                         </div>
                                     </div>
                                 </div>
@@ -1134,7 +1134,12 @@
             calculateRunStats();
         }
         
-        function removeFromRun(index) {
+        function removeFromRun(startTime) {
+            // Key by stable start_time, NOT a display index: the run list is rendered sorted by
+            // time, so a display index does not line up with the unsorted runEncounters array
+            // after a reorder — the old index-based call removed/toggled the wrong encounter. (#23)
+            const index = runEncounters.findIndex(e => e.start_time === startTime);
+            if (index === -1) return;
             runEncounters.splice(index, 1);
             updateRunDisplay();
             calculateRunStats();
@@ -1232,10 +1237,11 @@
             console.log('[RunBuilder] Attempt flag:', enc.target_name, enc.is_attempt);
         }
         
-        function toggleRunAttemptFlag(idx) {
-            const enc = runEncounters[idx];
+        function toggleRunAttemptFlag(startTime) {
+            // Key by stable start_time, NOT a display index (see removeFromRun). (#23)
+            const enc = runEncounters.find(e => e.start_time === startTime);
             if (!enc) return;
-            
+
             enc.is_attempt = !enc.is_attempt;
             updateRunDisplay();
             calculateRunStats();

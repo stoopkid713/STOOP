@@ -524,18 +524,21 @@
         function calculate5SecBurst(rotation) {
             if (!rotation || rotation.length === 0) return 0;
             
-            // Build damage per second
+            // Build damage per second across the WHOLE fight (no 60s cap — long TL fights had
+            // their peak 5s burst computed only from the first minute). (#17)
             const dpsPerSecond = {};
+            let last = 0;
             rotation.forEach(hit => {
                 const sec = Math.floor(hit.relative_time);
-                if (sec <= 60) {
+                if (sec >= 0) {
                     dpsPerSecond[sec] = (dpsPerSecond[sec] || 0) + hit.damage;
+                    if (sec > last) last = sec;
                 }
             });
-            
-            // Calculate 5-second rolling DPS (positions 0-55)
+
+            // Calculate 5-second rolling DPS over every window in the fight
             let peakBurst = 0;
-            for (let i = 0; i <= 55; i++) {
+            for (let i = 0; i <= last; i++) {
                 let sum = 0;
                 for (let j = i; j < i + 5; j++) {
                     sum += dpsPerSecond[j] || 0;
@@ -545,7 +548,7 @@
                     peakBurst = avgDps;
                 }
             }
-            
+
             return peakBurst;
         }
         
