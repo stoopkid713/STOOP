@@ -46,5 +46,24 @@ STOOP is a **DPS meter / live party scoreboard for Throne & Liberty**. It reads 
 - **Parallel work:** independent segments run as git-worktree "lanes" (own branch, gate-stop,
   no self-merge); the maintainer reviews + merges. Cap ~2–3 concurrent.
 
+## Running autonomous loops (`/goal`)
+When driving multi-bug or backlog work with `/goal` in this repo, these gates apply (full
+rationale: the maintainer's `full-loop` skill). A pasted `/goal` does **not** load that skill,
+so the discipline lives here to be inherited:
+- **Provable condition only.** The `/goal` condition must be verifiable from the transcript:
+  issues **CLOSED with commit hashes** + `uv run pytest` exits 0 (zero failures, 21 skipped) +
+  frontend fixes shown via **preview-eval** evidence. Never vague ("resolve a few elements").
+- **`/goal` syntax:** the cap goes **once, inside** the condition string (`…, or stop after N
+  turns`). No trailing flag / `--max-turns`; don't duplicate the clause.
+- **Backstop:** the deterministic Stop hook is the real ceiling — the `/goal` turn clause is only
+  a hint. Never rely on the turn clause alone.
+- **State = the board.** The STOOP Projects board / issues (#1) is the source of truth; one issue
+  per fix, close with the commit hash.
+- **Loop-SAFE targets only** (in-repo verifiable): `backend/` (pytest), `src/js/` frontend
+  (preview-eval), `overlay/`. **Loop-UNSAFE — never autonomous:** `workers/party/` and analytics
+  bugs need a live 2-PC party / live submission data; verify those by hand.
+- **Per-fix chain:** write/confirm the failing test first (makes the condition provable) → verify
+  against fresh reads → close the issue → finish the branch at the end.
+
 > Cold-start map only. Keep it short; fix any line here that goes stale.
 > Decisions → `DECISIONS.md` · how/why → PROJECT-GUIDE · what's next → punchlist.
