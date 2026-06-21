@@ -310,7 +310,10 @@ def parse_encounter_details(log_file_path: Optional[Path], target_name: str,
                     continue
                 if target != target_name:
                     continue
-                timestamp = _parse_log_timestamp(timestamp_str)
+                try:
+                    timestamp = _parse_log_timestamp(timestamp_str)
+                except Exception:
+                    continue  # skip one malformed row, never blank the whole view (#3)
                 if timestamp < time_window_start or timestamp > time_window_end:
                     continue
 

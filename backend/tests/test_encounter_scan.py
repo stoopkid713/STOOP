@@ -264,3 +264,30 @@ def test_details_window_excludes_outside(tmp_path):
     d = encounter_scan.parse_encounter_details(log, "Mob", start, {})
     assert d["hit_count"] == 2
     assert d["total_damage"] == 200
+
+
+def test_details_skips_malformed_line(tmp_path):
+    """One bad timestamp line is skipped, not fatal (issue #3).
+
+    Regression: ``parse_encounter_details`` had no per-line guard, so a single
+    malformed row threw -> the outer except returned ``None`` -> the whole detail
+    view went blank. The good hits on either side must still be counted.
+    """
+    good = _mklog(tmp_path, [
+        ("10:00:00", "S", 100, False, False, "Mob"),
+        ("10:00:02", "S", 100, False, False, "Mob"),
+    ])
+    # Splice a row with an unparseable timestamp between the two good rows.
+    lines = good.read_text(encoding="utf-8").splitlines()
+    bad = ",".join([
+        "20260104-NOTATIME:000", "DamageDone", "S", "1", "100",
+        "0", "0", "0", "Player", "Mob",
+    ])
+    lines.insert(2, bad)  # after header + first good row
+    good.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    start = datetime(2026, 1, 4, 10, 0, 0)
+    d = encounter_scan.parse_encounter_details(good, "Mob", start, {})
+    assert d is not None              # must NOT blank out the detail view
+    assert d["hit_count"] == 2        # both good hits survive; the bad row is skipped
+    assert d["total_damage"] == 200
