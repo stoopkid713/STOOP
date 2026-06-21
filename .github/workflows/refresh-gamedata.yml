@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # Fetch full history so the commit we push back doesn't lose provenance
           fetch-depth: 1
