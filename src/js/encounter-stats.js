@@ -667,7 +667,10 @@
                 
                 // Calculate 60s specific stats
                 const damage60 = timeline60.reduce((sum, d) => sum + (d || 0), 0);
-                const dps60 = damage60 / Math.min(60, duration);
+                // Guard divide-by-zero: a single-hit encounter has duration 0,
+                // which produced an "InfinityM" average DPS (#25).
+                const window60 = Math.min(60, duration);
+                const dps60 = window60 > 0 ? damage60 / window60 : 0;
                 
                 const peakDpsEl = document.getElementById('peakDps');
                 const avgDpsEl = document.getElementById('avgDps');

@@ -179,7 +179,9 @@
                 const categoryLabel = enc.category.toUpperCase().replace('_', ' ');
                 const durationLabel = enc.duration < 60 ? `${Math.round(enc.duration)}s` : `${Math.floor(enc.duration / 60)}m ${Math.round(enc.duration % 60)}s`;
                 const durationClass = enc.duration >= 60 ? 'valid' : 'warning';
-                const gapWarning = enc.gap_before >= 60 && enc.gap_before <= 90 ? `<span style="color: #fbbf24; font-size: 0.75rem;">⚠️ ${Math.round(enc.gap_before)}s gap</span>` : '';
+                // Warn on any gap >= 60s. The old `<= 90` upper bound (#24) hid
+                // the warning for the *worst* gaps (anything over 90s).
+                const gapWarning = enc.gap_before >= 60 ? `<span style="color: #fbbf24; font-size: 0.75rem;">⚠️ ${Math.round(enc.gap_before)}s gap</span>` : '';
                 
                 return `
                     <div class="encounter-item" style="background: #1D2F50; border: 1px solid #263956; border-radius: 6px; padding: 12px; margin-bottom: 8px;">
