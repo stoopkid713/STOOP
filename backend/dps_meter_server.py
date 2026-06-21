@@ -570,17 +570,20 @@ class DPSMeterServer:
         assignments.update(p.load_target_assignments(self.data_dir).get("assignments", {}))
         return assignments
 
-    def _encounter_history(self) -> list[dict]:
+    def _encounter_history(self, whole_folder: bool = False) -> list[dict]:
         """Encounter summaries for the Encounters tab (disasm ``get_encounter_history``).
 
-        Re-parses the active log file via ``encounter_scan.parse_encounters_from_log``
-        (category-specific archboss/boss/adds segmentation) and serializes to the WS
-        entry shape. Returns [] when no log file is present.
+        Default re-parses the active log file via ``encounter_scan.parse_encounters_from_log``
+        (category-specific archboss/boss/adds segmentation). With ``whole_folder=True`` it
+        ingests EVERY ``*.txt`` in the log folder via ``parse_encounters_from_folder`` so
+        historical/rolled logs surface (#43); the default stays active-file-only to keep the
+        common path fast. Serializes to the WS entry shape; [] when no log is present.
         """
-        encounters = encounter_scan.parse_encounters_from_log(
-            self._active_log_file(),
-            {"assignments": self._effective_target_assignments()},
-        )
+        assignments = {"assignments": self._effective_target_assignments()}
+        if whole_folder:
+            encounters = encounter_scan.parse_encounters_from_folder(self._log_dir(), assignments)
+        else:
+            encounters = encounter_scan.parse_encounters_from_log(self._active_log_file(), assignments)
         return encounter_scan.encounter_history_payload(encounters)
 
     # --- introspection for the watcher/host (Phase 4+) ---------------------
@@ -662,7 +665,9 @@ def _h_get_dungeons(s: DPSMeterServer, msg: dict) -> dict:
 
 
 def _h_get_encounter_history(s: DPSMeterServer, msg: dict) -> dict:
-    return {"type": "encounter_history", "encounters": s._encounter_history()}
+    # Opt-in whole-folder ingest (#43): default stays active-file-only.
+    return {"type": "encounter_history",
+            "encounters": s._encounter_history(whole_folder=bool(msg.get("whole_folder", False)))}
 
 
 def _h_get_builds(s: DPSMeterServer, msg: dict) -> dict:

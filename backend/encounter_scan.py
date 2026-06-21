@@ -228,6 +228,22 @@ def parse_encounters_from_log(log_file_path: Optional[Path],
         return []
 
 
+def parse_encounters_from_folder(log_dir: Optional[Path],
+                                 target_assignments: dict) -> list[dict]:
+    """Detect encounters across EVERY ``*.txt`` combat log in ``log_dir`` — not just the
+    newest file — so historical/rolled logs are captured (#43). Each file is parsed
+    independently via :func:`parse_encounters_from_log`; the results are concatenated and
+    re-sorted by ``end_time`` descending (most recent first). ``[]`` on a missing dir.
+    """
+    if not log_dir or not Path(log_dir).is_dir():
+        return []
+    encounters: list[dict] = []
+    for log_file in sorted(Path(log_dir).glob("*.txt")):
+        encounters.extend(parse_encounters_from_log(log_file, target_assignments))
+    encounters.sort(key=lambda e: e["end_time"], reverse=True)
+    return encounters
+
+
 def encounter_history_payload(encounters: list[dict]) -> list[dict]:
     """Serialize :func:`parse_encounters_from_log` output to the WS entry shape.
 
