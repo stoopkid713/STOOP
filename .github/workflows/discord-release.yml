@@ -1,4 +1,4 @@
-﻿name: Discord Release Embed
+name: Discord Release Embed
 
 on:
   release:
@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Post release embed to Discord #announcements
-        uses: SethCohen/github-releases-to-discord@v1.15.1
+        uses: SethCohen/github-releases-to-discord@v1.20.0
         with:
           webhook_url: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
           color: "3066993"
