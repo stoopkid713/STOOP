@@ -223,7 +223,7 @@ const KNOWN_BOSSES = {
   "morokai": "field_boss",
   "morokai's ghost": "boss",
   "murdock": "boss",
-  "mutant beast": "boss",
+  "mutant abomination": "boss",
   "mutant chef": "boss",
   "mutant killer": "boss",
   "nerzatum": "boss",
