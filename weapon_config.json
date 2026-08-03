@@ -328,6 +328,7 @@
     "Evasion Expertise": "wand",
     "Evasion Intensity": "dagger",
     "Explosive Flurry": "other",
+    "Explosive Flurry - Cooldown ▼": "other",
     "Explosive Flurry - Damage ▲": "other",
     "Explosive Flurry - Skill Range ▲": "other",
     "Explosive Flurry - Stamina Recovery": "other",
@@ -662,7 +663,7 @@
     "Mobility Strike": "other",
     "Mobility Strike - Additional Effects": "other",
     "Mobility Strike - Cooldown ▼": "other",
-    "Mobility Strike - Mobility Enchant": "other",
+    "Mobility Strike - Skill Range ▲": "other",
     "Momentum": "other",
     "Morale Boost": "sns",
     "Mortal Mark": "crossbow",
@@ -1082,5 +1083,5 @@
     "Zephyr's Nock - Damage ▲": "longbow",
     "^<imgf=IMG_PartyMatching_MainAttacker> Sword of Judgment": "other"
   },
-  "last_updated": "2026-07-27T14:52:41.818624"
+  "last_updated": "2026-08-03T14:56:44.030184"
 }

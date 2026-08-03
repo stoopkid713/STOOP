@@ -244,6 +244,7 @@ const KNOWN_BOSSES = {
   "queen blood spider": "boss",
   "quente, executor of the seal": "boss",
   "radeth": "archboss",
+  "ramux": "archboss",
   "reptilian butcher": "boss",
   "resurrected zaroth": "boss",
   "revenger skeleton commander": "boss",

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "patch": "",
-  "last_updated": "2026-07-27T14:52:41Z",
+  "last_updated": "2026-08-03T14:56:44Z",
   "generated_from": "questlog.gg tRPC feeds (getSkillSets + getSkillTraits + getWeaponSpecializations)",
   "source": "https://questlog.gg/throne-and-liberty",
   "entries": {
@@ -329,6 +329,7 @@
     "Evasion Expertise": "wand",
     "Evasion Intensity": "dagger",
     "Explosive Flurry": "other",
+    "Explosive Flurry - Cooldown ▼": "other",
     "Explosive Flurry - Damage ▲": "other",
     "Explosive Flurry - Skill Range ▲": "other",
     "Explosive Flurry - Stamina Recovery": "other",
@@ -663,7 +664,7 @@
     "Mobility Strike": "other",
     "Mobility Strike - Additional Effects": "other",
     "Mobility Strike - Cooldown ▼": "other",
-    "Mobility Strike - Mobility Enchant": "other",
+    "Mobility Strike - Skill Range ▲": "other",
     "Momentum": "other",
     "Morale Boost": "sns",
     "Mortal Mark": "crossbow",
