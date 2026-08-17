@@ -192,11 +192,6 @@
     "Critical Damage Intensity": "longbow",
     "Critical Damage Resistance Augment": "longbow",
     "Critical Equilibrium": "greatsword",
-    "Critical Hit": "other",
-    "Critical Hit - Aggro ▲": "other",
-    "Critical Hit - All Defense ▲": "other",
-    "Critical Hit - Chain Skill": "other",
-    "Critical Hit - Damage ▲": "other",
     "Critical Hit Augment": "dagger",
     "Critical Hit Expertise": "staff",
     "Crowd Control Intensity": "dagger",
@@ -860,6 +855,11 @@
     "Shield Throw - Whirling Shield": "sns",
     "Shielded Target Damage Augment": "orb",
     "Shielded by Unity": "other",
+    "Short Jab": "other",
+    "Short Jab - Aggro ▲": "other",
+    "Short Jab - All Defense ▲": "other",
+    "Short Jab - Chain Skill": "other",
+    "Short Jab - Damage ▲": "other",
     "Shredding Strike": "sns",
     "Silence Chance Response": "wand",
     "Silence Resistance Augment": "staff",
@@ -1083,5 +1083,5 @@
     "Zephyr's Nock - Damage ▲": "longbow",
     "^<imgf=IMG_PartyMatching_MainAttacker> Sword of Judgment": "other"
   },
-  "last_updated": "2026-08-10T13:25:11.336208"
+  "last_updated": "2026-08-17T12:57:24.184627"
 }
