@@ -39,8 +39,10 @@ STOOP is a **DPS meter / live party scoreboard for Throne & Liberty**. It reads 
   the app does not — DECISIONS ADR-006.)
 
 ## Hard rules (the ones that bite)
-- **Frontend:** edit the module sources in `src/js/*.js` (and `party_render.js`); the build
-  **re-inlines** them into `index.html`. **Never edit the inlined copies in `index.html`.** (ADR-003)
+- **Frontend:** `build.py` generates only the `@inject:<name>` … `@end:<name>` regions of
+  `index.html` and `overlay/src/index.html`, from `src/js/<name>.js` and `party_render.js`. Edit
+  those regions in the module sources. Everything outside them (markup, CSS, the rest of the
+  script) is hand-written: edit it in place. (ADR-003)
 - **Worker:** keep every change backward-compatible — many app versions are live at once — and
   do **not** deploy while parties are live. (ADR-004 / ADR-007)
 - **Parallel work:** independent segments run as git-worktree "lanes" (own branch, gate-stop,
