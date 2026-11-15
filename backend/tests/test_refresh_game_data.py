@@ -688,3 +688,77 @@ def test_is_junk_edge_cases():
     assert not rgd._is_junk_boss_name("m gorilla thuban")
     # Does not start with m_
     assert not rgd._is_junk_boss_name("x_something_else")
+
+
+# --- unmapped weapon categories (#79) ------------------------------------------------------
+def test_unmapped_categories_names_unknown_category():
+    sets = [{"name": "Zap", "mainCategory": "Gauntlet"}, {"name": "Slash", "mainCategory": "sword"}]
+    traits = [{"name": "Zap - Shock", "mainCategory": "gauntlet"}]
+    specs = [{"name": "Fist Mastery", "mainCategory": "fist"}]
+    assert rgd.unmapped_categories(sets, traits, specs) == ["fist", "gauntlet"]
+
+
+def test_unmapped_categories_known_categories_report_nothing():
+    sets = [{"name": "Slash", "mainCategory": "sword"}, {"name": "Bash", "mainCategory": " SWORD2H "}]
+    specs = [{"name": "Bow Mastery", "mainCategory": "bow"}]
+    assert rgd.unmapped_categories(sets, None, specs) == []
+
+
+def test_unmapped_warning_lines_are_github_annotations():
+    lines = rgd.unmapped_warning_lines(["gauntlet"])
+    assert len(lines) == 1
+    assert lines[0].startswith("::warning::") and "gauntlet" in lines[0]
+    assert rgd.unmapped_warning_lines([]) == []
+
+
+def test_unmapped_category_still_buckets_to_other():
+    sets = [{"name": "Zap", "mainCategory": "gauntlet"}]
+    assert rgd.extract_skill_weapons(sets) == {"Zap": "other"}
+
+
+# --- feed-count gate (#79; pure, no network) -----------------------------------------------
+def _healthy_feeds():
+    return {
+        "getSkillSets": [{"name": f"S{i}", "mainCategory": "sword"} for i in range(180)],
+        "getSkillTraits": [{"name": f"T{i}", "mainCategory": "bow"} for i in range(356)],
+        "getWeaponSpecializations": [{"name": f"M{i}", "mainCategory": "orb"} for i in range(490)],
+        "getDungeons": [{"name": "D"}],
+    }
+
+
+def test_check_feeds_healthy_passes():
+    assert rgd.check_feeds(_healthy_feeds()) == []
+
+
+def test_check_feeds_zero_record_feed_fails():
+    feeds = _healthy_feeds()
+    feeds["getDungeons"] = []
+    failures = rgd.check_feeds(feeds)
+    assert len(failures) == 1 and "getDungeons" in failures[0]
+
+
+def test_check_feeds_under_half_expected_fails():
+    feeds = _healthy_feeds()
+    feeds["getSkillSets"] = feeds["getSkillSets"][:89]  # 89 < 180 / 2
+    failures = rgd.check_feeds(feeds)
+    assert len(failures) == 1 and "getSkillSets" in failures[0]
+
+
+def test_check_feeds_exactly_half_expected_passes():
+    feeds = _healthy_feeds()
+    feeds["getSkillSets"] = feeds["getSkillSets"][:90]
+    assert rgd.check_feeds(feeds) == []
+
+
+def test_check_feeds_missing_required_field_fails():
+    feeds = _healthy_feeds()
+    feeds["getSkillTraits"][5] = {"name": "T5"}  # no mainCategory
+    failures = rgd.check_feeds(feeds)
+    assert len(failures) == 1 and "getSkillTraits" in failures[0] and "mainCategory" in failures[0]
+
+
+def test_check_feeds_blank_name_fails():
+    feeds = _healthy_feeds()
+    feeds["getWeaponSpecializations"][0] = {"name": "  ", "mainCategory": "orb"}
+    failures = rgd.check_feeds(feeds)
+    assert len(failures) == 1 and "name" in failures[0]

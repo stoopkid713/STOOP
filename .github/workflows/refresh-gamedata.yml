@@ -49,6 +49,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
 
+      - name: Feed-count gate (fails on empty / <50% / malformed feeds)
+        # Live-probes every feed; exits non-zero on drift so we never regenerate from bad data.
+        # Also emits ::warning:: annotations for any unmapped weapon mainCategory.
+        run: python backend/tools/refresh_game_data.py --counts
+
       - name: Run game data refresh (G3 + G4)
         id: refresh
         run: |
