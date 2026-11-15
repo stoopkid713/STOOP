@@ -39,8 +39,10 @@ STOOP is a **DPS meter / live party scoreboard for Throne & Liberty**. It reads 
   the app does not — DECISIONS ADR-006.)
 
 ## Hard rules (the ones that bite)
-- **Frontend:** edit the module sources in `src/js/*.js` (and `party_render.js`); the build
-  **re-inlines** them into `index.html`. **Never edit the inlined copies in `index.html`.** (ADR-003)
+- **Frontend:** `build.py` generates only the `@inject:<name>` … `@end:<name>` regions of
+  `index.html` and `overlay/src/index.html`, from `src/js/<name>.js` and `party_render.js`. Edit
+  those regions in the module sources. Everything outside them (markup, CSS, the rest of the
+  script) is hand-written: edit it in place. (ADR-003)
 - **Worker:** keep every change backward-compatible — many app versions are live at once — and
   do **not** deploy while parties are live. (ADR-004 / ADR-007)
 - **Parallel work:** independent segments run as git-worktree "lanes" (own branch, gate-stop,
@@ -64,6 +66,20 @@ so the discipline lives here to be inherited:
   bugs need a live 2-PC party / live submission data; verify those by hand.
 - **Per-fix chain:** write/confirm the failing test first (makes the condition provable) → verify
   against fresh reads → close the issue → finish the branch at the end.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `stoopkid713/STOOP` (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root; existing decisions are in `DECISIONS.md`. See `docs/agents/domain.md`.
 
 > Cold-start map only. Keep it short; fix any line here that goes stale.
 > Decisions → `DECISIONS.md` · how/why → PROJECT-GUIDE · what's next → punchlist.
