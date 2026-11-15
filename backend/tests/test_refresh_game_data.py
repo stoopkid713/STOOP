@@ -750,15 +750,26 @@ def test_check_feeds_exactly_half_expected_passes():
     assert rgd.check_feeds(feeds) == []
 
 
-def test_check_feeds_missing_required_field_fails():
+def test_check_feeds_field_missing_from_most_records_fails():
+    """Schema drift (a renamed/dropped field) shows up as the field missing nearly everywhere."""
     feeds = _healthy_feeds()
-    feeds["getSkillTraits"][5] = {"name": "T5"}  # no mainCategory
+    feeds["getSkillTraits"] = [{"name": r["name"]} for r in feeds["getSkillTraits"]]  # no mainCategory
     failures = rgd.check_feeds(feeds)
     assert len(failures) == 1 and "getSkillTraits" in failures[0] and "mainCategory" in failures[0]
 
 
-def test_check_feeds_blank_name_fails():
+def test_check_feeds_blank_name_on_most_records_fails():
     feeds = _healthy_feeds()
-    feeds["getWeaponSpecializations"][0] = {"name": "  ", "mainCategory": "orb"}
+    feeds["getWeaponSpecializations"] = [{"name": "  ", "mainCategory": "orb"}
+                                         for _ in feeds["getWeaponSpecializations"]]
     failures = rgd.check_feeds(feeds)
     assert len(failures) == 1 and "name" in failures[0]
+
+
+def test_check_feeds_tolerates_a_few_incomplete_records():
+    """Negative control: the extractor skips a nameless or categoryless record, so a handful
+    must not block the weekly refresh."""
+    feeds = _healthy_feeds()
+    feeds["getSkillTraits"][5] = {"name": "T5"}                              # no mainCategory
+    feeds["getWeaponSpecializations"][0] = {"name": "  ", "mainCategory": "orb"}
+    assert rgd.check_feeds(feeds) == []

@@ -10511,7 +10511,7 @@
                             <div class="encounters-list-header">
                                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
                                     <h3>📜 Session Encounters</h3>
-                                    <button onclick="requestSessionEncounters()" style="padding: 5px 10px; background: #22c55e; border: none; color: white; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3); transition: all 0.2s;" onmouseover="this.style.background='#16a34a'" onmouseout="this.style.background='#22c55e'">🔄 Refresh</button>
+                                    <button onclick="refreshSessionEncounters()" style="padding: 5px 10px; background: #22c55e; border: none; color: white; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 700; box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3); transition: all 0.2s;" onmouseover="this.style.background='#16a34a'" onmouseout="this.style.background='#22c55e'">🔄 Refresh</button>
                                 </div>
                                 <div style="font-size: 0.8rem; color: #7A8CB8; margin-bottom: 10px;">Click to view details</div>
                                 <label style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.85rem; color: #F0EBE0; cursor: pointer;">
@@ -12672,7 +12672,7 @@
                 // Refresh encounter history when switching to Encounters tab
                 if (tab.dataset.tab === 'encounters') {
                     if (ws && ws.readyState === WebSocket.OPEN) {
-                        requestSessionEncounters();
+                        requestEncounterHistory(false);  // tab switch never re-parses the whole folder (#69)
                     }
                 }
 
@@ -23118,7 +23118,6 @@ ${attemptLine}
                 setConnectionStatus(true);
                 hideDisconnectedBanner();  // Hide banner when connected
                 if (reconnectInterval) { clearInterval(reconnectInterval); reconnectInterval = null; }
-                encounterHistoryPending = [];  // replies on the old socket will never arrive
                 sendCommand('get_config');
                 sendCommand('get_encounters');
                 sendCommand('get_saved_runs');
@@ -23485,9 +23484,8 @@ ${attemptLine}
                     console.log('[TargetAssign] Saved:', msg.target_name, '→', msg.category);
                 }
                 else if (msg.type === 'encounter_history') {
-                    // Replies come back in request order; the reply carries no flag, so match it
-                    // to the request that asked for the whole folder (#69).
-                    const wholeFolder = encounterHistoryPending.shift() === true;
+                    // The backend echoes whole_folder on the reply (#69).
+                    const wholeFolder = msg.whole_folder === true;
                     if (wholeFolder) {
                         // Whole-folder history feeds the Encounters list only (and only while
                         // the toggle is still on) - not Run Builder or the target list.
@@ -23667,14 +23665,10 @@ ${attemptLine}
             if (banner) banner.classList.remove('visible');
         }
 
-        // get_encounter_history replies are not tagged, so remember which requests asked for the
-        // whole folder (FIFO, one entry per request) and match replies to them by order.
-        let encounterHistoryPending = [];
-        let showAllLogs = false;
+        let showAllLogs = false;   // Encounters tab "Show all logs" toggle (#69)
 
         function requestEncounterHistory(wholeFolder) {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
-            encounterHistoryPending.push(!!wholeFolder);
             ws.send(JSON.stringify(wholeFolder
                 ? { command: 'get_encounter_history', whole_folder: true }
                 : { command: 'get_encounter_history' }));
@@ -23682,6 +23676,13 @@ ${attemptLine}
 
         function requestSessionEncounters() {
             requestEncounterHistory(showAllLogs);
+        }
+
+        // Encounters tab Refresh: same as before #69 (clears the Run Builder selection), but
+        // honours the toggle.
+        function refreshSessionEncounters() {
+            selectedTimelineIndices.clear();
+            requestSessionEncounters();
         }
 
         function toggleShowAllLogs(on) {

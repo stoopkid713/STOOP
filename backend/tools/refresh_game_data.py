@@ -875,8 +875,10 @@ REQUIRED_FIELDS = {
 def check_feeds(feeds: dict, expected: dict | None = None, required: dict | None = None) -> list:
     """Gate check over already-pulled feeds ({feed name -> records}); returns failure strings.
 
-    Fails a feed that has zero records, fewer than half its expected count, or any record
-    missing/blank in a field the extractor requires. Empty list = healthy. Pure: no network.
+    Fails a feed that has zero records, fewer than half its expected count, or a field the
+    extractor reads missing/blank on more than half its records (schema drift). The extractor
+    skips an individual nameless or categoryless record, so a few do not fail the gate.
+    Empty list = healthy. Pure: no network.
     """
     expected = EXPECTED_COUNTS if expected is None else expected
     required = REQUIRED_FIELDS if required is None else required
@@ -891,8 +893,8 @@ def check_feeds(feeds: dict, expected: dict | None = None, required: dict | None
             failures.append(f"{name}: {n} records is under half the expected {want}")
         for field in required.get(name, ()):
             bad = sum(1 for r in records if not str(r.get(field) or "").strip())
-            if bad:
-                failures.append(f"{name}: {bad} record(s) missing required field '{field}'")
+            if bad > n / 2:
+                failures.append(f"{name}: {bad} of {n} records missing required field '{field}'")
     return failures
 
 
@@ -902,9 +904,8 @@ def _counts() -> int:
     traits = pull_skill_traits()
     specs = pull_weapon_specializations()
     feeds = {"getSkillSets": sets, "getSkillTraits": traits, "getWeaponSpecializations": specs}
-    print(f"  getSkillSets ............. {len(sets):>5}  (expect ~180)")
-    print(f"  getSkillTraits .......... {len(traits):>5}  (expect ~356)")
-    print(f"  getWeaponSpecializations  {len(specs):>5}  (expect ~490)")
+    for name, records in feeds.items():
+        print(f"  {name:<25} {len(records):>5}  (expect ~{EXPECTED_COUNTS[name]})")
     for cat in NPC_BOSS_CATEGORIES:
         npcs = pull_npcs(cat)
         feeds[f"getNpcs[{cat}]"] = npcs

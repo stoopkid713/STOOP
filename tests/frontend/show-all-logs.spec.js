@@ -4,7 +4,7 @@ const { test, expect } = require('@playwright/test');
 const { openApp } = require('./harness');
 
 // Answer every get_encounter_history the app has sent but we have not yet replied to, the way
-// the real backend does (one reply per request, in order, whole-folder only when flagged).
+// the real backend does (one reply per request, echoing whole_folder).
 async function serveHistory(page, { active, folder }) {
   await page.evaluate(([a, f]) => {
     const m = window.__mock;
@@ -12,7 +12,7 @@ async function serveHistory(page, { active, folder }) {
     const reqs = m.sentBackend().filter(c => c.command === 'get_encounter_history');
     for (; m.__served < reqs.length; m.__served++) {
       const req = reqs[m.__served];
-      m.pushBackend({ type: 'encounter_history', encounters: req.whole_folder ? f : a });
+      m.pushBackend({ type: 'encounter_history', whole_folder: !!req.whole_folder, encounters: req.whole_folder ? f : a });
     }
   }, [active, folder]);
 }
@@ -91,4 +91,42 @@ test('whole-folder reply does not populate Run Builder timeline or target list; 
   expect(await page.evaluate(() => timelineEncounters.map(e => e.target_name))).toEqual(['ActiveBoss']);
   expect(await page.evaluate(() => allKnownTargets.has('Hist0'))).toBe(false);
   expect(await page.evaluate(() => encounterHistory.length)).toBe(1);
+});
+
+test('a failed whole-folder request does not misroute the next normal reply', async ({ page }) => {
+  await openApp(page);
+  await openEncountersTab(page);
+  await serveHistory(page, { active: [], folder: [] });            // drain the opening requests
+  await page.locator('#showAllLogsToggle').check();
+  // The backend answers a failed handler with an error frame instead of encounter_history.
+  await page.evaluate(() => { window.__mock.__served++; window.__mock.pushBackend({ type: 'error', message: 'parse failed' }); });
+  await page.getByRole('button', { name: 'OK', exact: true }).click();                    // the app surfaces the error as an alert
+  await page.locator('#showAllLogsToggle').uncheck();
+  await serveHistory(page, { active: [enc('ActiveBoss', 1)], folder: many('Hist', 3) });
+  await expect.poll(() => page.evaluate(() => timelineEncounters.map(e => e.target_name))).toEqual(['ActiveBoss']);
+  await expect(page.locator('#encountersSessionList .encounters-session-item')).toHaveCount(1);
+});
+
+test('Encounters Refresh still clears the Run Builder selection', async ({ page }) => {
+  await openApp(page);
+  await openEncountersTab(page);
+  await page.evaluate(() => selectedTimelineIndices.add(0));
+  await page.locator('.encounters-list-header button', { hasText: 'Refresh' }).click();
+  expect(await page.evaluate(() => selectedTimelineIndices.size)).toBe(0);
+});
+
+test('re-opening the Encounters tab with the toggle on does not re-parse the whole folder', async ({ page }) => {
+  await openApp(page);
+  await openEncountersTab(page);
+  await page.locator('#showAllLogsToggle').check();
+  await serveHistory(page, { active: [], folder: many('Hist', 5) });
+  await expect(page.locator('#encountersSessionList .encounters-session-item')).toHaveCount(5);
+
+  await page.evaluate(() => { window.__mock.clearSent(); window.__mock.__served = 0; });
+  await page.locator('[data-tab="dashboard"]').first().click();
+  await page.locator('[data-tab="encounters"]').first().click();
+  await expect.poll(async () => (await historyRequests(page)).length).toBeGreaterThan(0);
+  expect((await historyRequests(page)).every(r => !('whole_folder' in r))).toBe(true);
+  await serveHistory(page, { active: [enc('ActiveBoss', 1)], folder: many('Hist', 5) });
+  await expect(page.locator('#encountersSessionList .encounters-session-item')).toHaveCount(5);  // list keeps the folder view
 });

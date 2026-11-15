@@ -666,8 +666,10 @@ def _h_get_dungeons(s: DPSMeterServer, msg: dict) -> dict:
 
 def _h_get_encounter_history(s: DPSMeterServer, msg: dict) -> dict:
     # Opt-in whole-folder ingest (#43): default stays active-file-only.
-    return {"type": "encounter_history",
-            "encounters": s._encounter_history(whole_folder=bool(msg.get("whole_folder", False)))}
+    # The reply echoes the flag so the frontend can route it without inferring from order (#69).
+    whole_folder = bool(msg.get("whole_folder", False))
+    return {"type": "encounter_history", "whole_folder": whole_folder,
+            "encounters": s._encounter_history(whole_folder=whole_folder)}
 
 
 def _h_get_builds(s: DPSMeterServer, msg: dict) -> dict:

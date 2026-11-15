@@ -314,7 +314,7 @@
                 // Refresh encounter history when switching to Encounters tab
                 if (tab.dataset.tab === 'encounters') {
                     if (ws && ws.readyState === WebSocket.OPEN) {
-                        requestSessionEncounters();
+                        requestEncounterHistory(false);  // tab switch never re-parses the whole folder (#69)
                     }
                 }
 
