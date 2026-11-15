@@ -90,3 +90,15 @@ test('a reply never self-triggers a request (no loop without a new call)', () =>
   for (let i = 0; i < 10; i++) deliver(detailReply(null));
   assert.strictEqual(requests().length, 1);
 });
+
+const resultsHtml = (ctx) => ctx("document.getElementById('results').innerHTML");
+
+test('Skills tab: answered-but-empty detail shows "no breakdown", never a permanent Loading…', () => {
+  const { deliver, ctx } = loadOverlay();
+  ctx("ovSwitchTab('skills')");
+  assert.match(resultsHtml(ctx), /Loading/, 'before any reply the tab is loading (control)');
+  deliver(detailReply(null));
+  ctx('render()');
+  assert.doesNotMatch(resultsHtml(ctx), /Loading/, 'a null reply is an answer, not a pending load');
+  assert.match(resultsHtml(ctx), /No breakdown/);
+});

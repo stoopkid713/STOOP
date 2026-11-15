@@ -942,6 +942,11 @@ const PartyRender = {
             const d = state.memberDetails[encId + ':' + userId];
             return (d && d.rotation) || null;
         }
+        // True once the worker has replied for this member, even with an empty breakdown.
+        // Distinguishes "still loading" from "answered: nothing to show" (#18).
+        function ovDetailAnswered(encId, userId) {
+            return !!state.memberDetails[encId + ':' + userId];
+        }
         function ovDrillableEntries() {
             const b = ovCurrentBoard();
             return (b && Array.isArray(b.entries)) ? b.entries.filter((e) => e.has_detail) : [];
@@ -976,8 +981,8 @@ const PartyRender = {
             ovEnsureDetail(encId, state.skillsMember);
             const rot = ovRotationFor(encId, state.skillsMember);
             let body;
-            if (!rot) body = '<div class="ov-detail-loading">Loading…</div>';
-            else if (!rot.length) body = '<div class="pr-empty">No breakdown for this member.</div>';
+            if (!rot && !ovDetailAnswered(encId, state.skillsMember)) body = '<div class="ov-detail-loading">Loading…</div>';
+            else if (!rot || !rot.length) body = '<div class="pr-empty">No breakdown for this member.</div>';
             else body = PartyRender.skillTableHtml(rot, { compact: true }) + PartyRender.rotationChartHtml(rot, { compact: true });
             container.innerHTML = picker + body;
             document.getElementById('playerCount').textContent = entries.length + ' player' + (entries.length !== 1 ? 's' : '');
@@ -998,7 +1003,10 @@ const PartyRender = {
             const pickers = '<div class="ov-cmp-pickers"><select onchange="ovCmpChange(\'A\', this.value)">' + ovMemberOptions(state.cmpA)
                 + '</select><span class="pr-cmp-vs-lbl">VS</span><select onchange="ovCmpChange(\'B\', this.value)">' + ovMemberOptions(state.cmpB) + '</select></div>';
             let body;
-            if (!rotA || !rotB) body = '<div class="ov-detail-loading">Loading…</div>';
+            const missingA = !rotA, missingB = !rotB;
+            const stillLoading = (missingA && !ovDetailAnswered(encId, state.cmpA)) || (missingB && !ovDetailAnswered(encId, state.cmpB));
+            if (stillLoading) body = '<div class="ov-detail-loading">Loading…</div>';
+            else if (missingA || missingB) body = '<div class="pr-empty">No breakdown for ' + PartyRender.escapeHtml(nameOf(missingA ? state.cmpA : state.cmpB)) + '.</div>';
             else body = PartyRender.compareHtml(rotA, rotB, { name: nameOf(state.cmpA) }, { name: nameOf(state.cmpB) }, { compact: true });
             container.innerHTML = pickers + body;
         }
