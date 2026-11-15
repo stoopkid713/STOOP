@@ -65,5 +65,19 @@ so the discipline lives here to be inherited:
 - **Per-fix chain:** write/confirm the failing test first (makes the condition provable) → verify
   against fresh reads → close the issue → finish the branch at the end.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `stoopkid713/STOOP` (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root; existing decisions are in `DECISIONS.md`. See `docs/agents/domain.md`.
+
 > Cold-start map only. Keep it short; fix any line here that goes stale.
 > Decisions → `DECISIONS.md` · how/why → PROJECT-GUIDE · what's next → punchlist.
