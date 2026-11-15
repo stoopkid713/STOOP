@@ -1,7 +1,7 @@
 // Issue #18 — overlay member-detail re-request. Loads the REAL inline <script> of
 // overlay/src/index.html into a vm sandbox with a stubbed DOM + WebSocket, and observes
 // behaviour only at the socket seam (get_member_detail frames sent).
-// Run: node --test tests/overlay/
+// Run: node --test tests/overlay/*.test.js
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
