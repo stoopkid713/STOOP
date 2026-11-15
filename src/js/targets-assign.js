@@ -147,7 +147,7 @@
             }
             
             console.log('[EncounterHistory] Requesting encounter history');
-            ws.send(JSON.stringify({ command: 'get_encounter_history' }));
+            requestEncounterHistory(false);
         }
         
         function displayEncounterHistory(encounters) {
@@ -271,7 +271,7 @@
             selectedTimelineIndices.clear();
             
             console.log('[RunBuilder] Requesting encounter timeline');
-            ws.send(JSON.stringify({ command: 'get_encounter_history' }));
+            requestEncounterHistory(false);
         }
         
         function displayEncounterTimeline(encounters) {
