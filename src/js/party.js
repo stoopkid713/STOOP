@@ -373,13 +373,16 @@
                     partyState.roster = m.roster || [];
                     partyState.scoreboard = m.scoreboard || null;
                     partyState.encounters = m.encounters || [];
+                    const prevActiveAtWelcome = partyState.active_encounter_id;
                     partyState.active_encounter_id = m.active_encounter_id
                         || (m.scoreboard && m.scoreboard.encounter_id) || null;
                     if (m.scoreboard && m.scoreboard.encounter_id) {
                         partyState.boards[m.scoreboard.encounter_id] = m.scoreboard;
                     }
-                    // Default to following the active encounter on (re)join.
-                    if (partyState.viewing_encounter_id == null) {
+                    // Follow the active encounter on (re)join if we were following it (or had none);
+                    // stay put if the user pinned an older one (same rule as the 'encounters' case).
+                    if (partyState.viewing_encounter_id == null
+                        || partyState.viewing_encounter_id === prevActiveAtWelcome) {
                         partyState.viewing_encounter_id = partyState.active_encounter_id;
                     }
                     renderPartyMembers();

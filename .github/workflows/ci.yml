@@ -52,3 +52,32 @@ jobs:
             node --check "$f" || fail=1
           done
           exit $fail
+      # The overlay's code is an inline <script> in overlay/src/index.html, so the *.js glob
+      # above never sees it. Extract it and syntax-check it too.
+      - name: Syntax-check the overlay inline script
+        run: |
+          node -e "const fs=require('fs');const h=fs.readFileSync('overlay/src/index.html','utf8');fs.writeFileSync('/tmp/overlay-inline.js',h.slice(h.indexOf('<script>')+8,h.lastIndexOf('</script>')))"
+          node --check /tmp/overlay-inline.js
+      - name: Overlay unit tests (node:test, no dependencies)
+        run: node --test tests/overlay/*.test.js
+
+  frontend-tests:
+    # The asserting Playwright specs only. The capture-*.spec.js files record screenshots and
+    # video for review and assert nothing, so they stay out of the gate.
+    name: playwright (frontend)
+    # Pinned: the Playwright version in tests/frontend/package-lock.json has no browser build
+    # for the image ubuntu-latest now points at.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        working-directory: tests/frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run asserting specs
+        working-directory: tests/frontend
+        run: npx playwright test board.spec.js party-lifecycle.spec.js welcome-follow.spec.js --reporter=list

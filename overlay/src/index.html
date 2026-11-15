@@ -807,7 +807,7 @@ const PartyRender = {
         // Phase 2 (A5): multi-encounter stepping.
         encounters: [], activeId: null, viewingId: null, boards: {},
         // Phase 3 (C3): member drill-down.
-        detail: null, memberDetails: {},
+        detail: null, memberDetails: {}, pendingDetails: {},
         // Phase 3 (C4): compact tabs + A/B compare.
         activeTab: 'scoreboard', skillsMember: null, cmpA: null, cmpB: null,
     };
@@ -829,6 +829,7 @@ const PartyRender = {
         if (!partyCode) { updateStatus('error', 'No party code'); ovlog('no-party-code'); return; }
         ovlog('connect', { code: partyCode, name: playerName });
         wantOpen = true;
+        state.pendingDetails = {};   // a dropped socket never answers; don't leave requests stuck in flight
         if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
         if (ws) { try { ws.onclose = null; ws.close(); } catch (e) {} ws = null; }
         const qs = new URLSearchParams({ user_id: userId, username: playerName, leader: '0', spectator: '1' });
@@ -868,6 +869,7 @@ const PartyRender = {
                 case 'member_detail': {
                     const cacheKey = m.encounter_id + ':' + m.user_id;
                     state.memberDetails[cacheKey] = { skills: m.skills || null, rotation: m.rotation || null };
+                    delete state.pendingDetails[cacheKey];
                     if (state.detail && state.detail.encounter_id === m.encounter_id && state.detail.user_id === m.user_id) {
                         renderOvDetail();
                     }
@@ -925,8 +927,13 @@ const PartyRender = {
         function ovEnsureDetail(encId, userId) {
             if (!encId || !userId) return;
             const k = encId + ':' + userId;
-            if (state.memberDetails[k]) return;
+            // Only a usable (non-empty) rotation suppresses the request; a cached {rotation:null}
+            // (or []) is re-requested. pendingDetails bounds that to one request in flight per member.
+            const cached = state.memberDetails[k];
+            if (cached && Array.isArray(cached.rotation) && cached.rotation.length) return;
+            if (state.pendingDetails[k]) return;
             if (ws && ws.readyState === WebSocket.OPEN) {
+                state.pendingDetails[k] = true;
                 ovlog('member-detail-request', { encounter_id: encId, user_id: userId, via: state.activeTab });
                 ws.send(JSON.stringify({ type: 'get_member_detail', encounter_id: encId, user_id: userId }));
             }
@@ -934,6 +941,11 @@ const PartyRender = {
         function ovRotationFor(encId, userId) {
             const d = state.memberDetails[encId + ':' + userId];
             return (d && d.rotation) || null;
+        }
+        // True once the worker has replied for this member, even with an empty breakdown.
+        // Distinguishes "still loading" from "answered: nothing to show" (#18).
+        function ovDetailAnswered(encId, userId) {
+            return !!state.memberDetails[encId + ':' + userId];
         }
         function ovDrillableEntries() {
             const b = ovCurrentBoard();
@@ -969,8 +981,8 @@ const PartyRender = {
             ovEnsureDetail(encId, state.skillsMember);
             const rot = ovRotationFor(encId, state.skillsMember);
             let body;
-            if (!rot) body = '<div class="ov-detail-loading">Loading…</div>';
-            else if (!rot.length) body = '<div class="pr-empty">No breakdown for this member.</div>';
+            if (!rot && !ovDetailAnswered(encId, state.skillsMember)) body = '<div class="ov-detail-loading">Loading…</div>';
+            else if (!rot || !rot.length) body = '<div class="pr-empty">No breakdown for this member.</div>';
             else body = PartyRender.skillTableHtml(rot, { compact: true }) + PartyRender.rotationChartHtml(rot, { compact: true });
             container.innerHTML = picker + body;
             document.getElementById('playerCount').textContent = entries.length + ' player' + (entries.length !== 1 ? 's' : '');
@@ -991,7 +1003,10 @@ const PartyRender = {
             const pickers = '<div class="ov-cmp-pickers"><select onchange="ovCmpChange(\'A\', this.value)">' + ovMemberOptions(state.cmpA)
                 + '</select><span class="pr-cmp-vs-lbl">VS</span><select onchange="ovCmpChange(\'B\', this.value)">' + ovMemberOptions(state.cmpB) + '</select></div>';
             let body;
-            if (!rotA || !rotB) body = '<div class="ov-detail-loading">Loading…</div>';
+            const missingA = !rotA, missingB = !rotB;
+            const stillLoading = (missingA && !ovDetailAnswered(encId, state.cmpA)) || (missingB && !ovDetailAnswered(encId, state.cmpB));
+            if (stillLoading) body = '<div class="ov-detail-loading">Loading…</div>';
+            else if (missingA || missingB) body = '<div class="pr-empty">No breakdown for ' + PartyRender.escapeHtml(nameOf(missingA ? state.cmpA : state.cmpB)) + '.</div>';
             else body = PartyRender.compareHtml(rotA, rotB, { name: nameOf(state.cmpA) }, { name: nameOf(state.cmpB) }, { compact: true });
             container.innerHTML = pickers + body;
         }
