@@ -102,3 +102,21 @@ test('Skills tab: answered-but-empty detail shows "no breakdown", never a perman
   assert.doesNotMatch(resultsHtml(ctx), /Loading/, 'a null reply is an answer, not a pending load');
   assert.match(resultsHtml(ctx), /No breakdown/);
 });
+
+test('Compare tab: Loading only while a member is unanswered; names the member with no breakdown', () => {
+  const { deliver, ctx } = loadOverlay();
+  deliver({ type: 'welcome', encounter_active: false, active_encounter_id: 'E1', encounters: [{ encounter_id: 'E1' }],
+    scoreboard: { encounter_id: 'E1', boss: 'B', entries: [
+      { user_id: 'u1', username: 'Alice', rank: 1, has_detail: true },
+      { user_id: 'u2', username: 'Bob', rank: 2, has_detail: true }] } });
+  ctx("ovSwitchTab('compare')");
+  assert.match(resultsHtml(ctx), /Loading/, 'nothing answered yet (control)');
+  deliver(detailReply(null));                                     // u1 answered: empty
+  ctx('render()');
+  assert.match(resultsHtml(ctx), /Loading/, 'u2 still unanswered');
+  deliver({ type: 'member_detail', encounter_id: 'E1', user_id: 'u2', skills: null,
+    rotation: [{ relative_time: 0, skill: 'Slash', damage: 10, is_crit: false }] });
+  ctx('render()');
+  assert.doesNotMatch(resultsHtml(ctx), /Loading/);
+  assert.match(resultsHtml(ctx), /No breakdown for Alice/);
+});
