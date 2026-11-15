@@ -192,6 +192,26 @@ def weapon_slug(main_category) -> str:
     return WEAPON_MAP.get(str(main_category or "").strip().lower(), "other")
 
 
+def unmapped_categories(*feeds) -> list:
+    """Distinct non-empty `mainCategory` values (lowercased) in `feeds` that WEAPON_MAP lacks.
+
+    Those skills still bucket to 'other' (see weapon_slug) -- this makes it loud, not silent.
+    """
+    found = set()
+    for feed in feeds:
+        for rec in feed or []:
+            cat = str(rec.get("mainCategory") or "").strip().lower()
+            if cat and cat not in WEAPON_MAP:
+                found.add(cat)
+    return sorted(found)
+
+
+def unmapped_warning_lines(categories: list) -> list:
+    """GitHub Actions `::warning::` annotations (plain log lines elsewhere), one per category."""
+    return [f"::warning::Unmapped questlog mainCategory '{c}': skills bucketed to 'other'; "
+            f"add it to WEAPON_MAP" for c in categories]
+
+
 # --------------------------------------------------------------------------------------------
 # token normalization + the multi-feed skill->weapon extractor (recipe doc S7)
 # --------------------------------------------------------------------------------------------
@@ -837,21 +857,65 @@ def _load_feeds_from_cache(cache_dir: Path, with_passives: bool) -> tuple:
     return sets, traits, specs, passives
 
 
+# Expected record counts per feed (None = no known baseline; only the zero check applies).
+EXPECTED_COUNTS = {
+    "getSkillSets": 180,
+    "getSkillTraits": 356,
+    "getWeaponSpecializations": 490,
+}
+# Fields the extractor reads from each record (extract_skill_weapons: name + mainCategory).
+# Feeds not listed are not read by the extractor, so only emptiness is checked.
+REQUIRED_FIELDS = {
+    "getSkillSets": ("name", "mainCategory"),
+    "getSkillTraits": ("name", "mainCategory"),
+    "getWeaponSpecializations": ("name", "mainCategory"),
+}
+
+
+def check_feeds(feeds: dict, expected: dict | None = None, required: dict | None = None) -> list:
+    """Gate check over already-pulled feeds ({feed name -> records}); returns failure strings.
+
+    Fails a feed that has zero records, fewer than half its expected count, or a field the
+    extractor reads missing/blank on more than half its records (schema drift). The extractor
+    skips an individual nameless or categoryless record, so a few do not fail the gate.
+    Empty list = healthy. Pure: no network.
+    """
+    expected = EXPECTED_COUNTS if expected is None else expected
+    required = REQUIRED_FIELDS if required is None else required
+    failures = []
+    for name, records in feeds.items():
+        n = len(records)
+        if n == 0:
+            failures.append(f"{name}: zero records")
+            continue
+        want = expected.get(name)
+        if want and n < want / 2:
+            failures.append(f"{name}: {n} records is under half the expected {want}")
+        for field in required.get(name, ()):
+            bad = sum(1 for r in records if not str(r.get(field) or "").strip())
+            if bad > n / 2:
+                failures.append(f"{name}: {bad} of {n} records missing required field '{field}'")
+    return failures
+
+
 def _counts() -> int:
     print("Pulling questlog feeds (live)...")
     sets = pull_skill_sets()
     traits = pull_skill_traits()
     specs = pull_weapon_specializations()
-    print(f"  getSkillSets ............. {len(sets):>5}  (expect ~180)")
-    print(f"  getSkillTraits .......... {len(traits):>5}  (expect ~356)")
-    print(f"  getWeaponSpecializations  {len(specs):>5}  (expect ~490)")
+    feeds = {"getSkillSets": sets, "getSkillTraits": traits, "getWeaponSpecializations": specs}
+    for name, records in feeds.items():
+        print(f"  {name:<25} {len(records):>5}  (expect ~{EXPECTED_COUNTS[name]})")
     for cat in NPC_BOSS_CATEGORIES:
         npcs = pull_npcs(cat)
+        feeds[f"getNpcs[{cat}]"] = npcs
         names = len({n.get("name") for n in npcs})
         print(f"  getNpcs[{cat:<11}] ... {len(npcs):>5} rows / {names} distinct names")
     dungeons = pull_dungeons()
+    feeds["getDungeons"] = dungeons
     print(f"  getDungeons ............. {len(dungeons):>5}")
     items = pull_weapon_items()
+    feeds["getItems[weapons]"] = items
     print(f"  getItems[weapons] ....... {len(items):>5}")
     skill_map = extract_skill_weapons(sets, traits, specs)
     by_slug: dict = {}
@@ -859,7 +923,12 @@ def _counts() -> int:
         by_slug[slug] = by_slug.get(slug, 0) + 1
     print(f"  extracted skill->weapon . {len(skill_map):>5} tokens")
     print("    by slug: " + ", ".join(f"{k}={v}" for k, v in sorted(by_slug.items())))
-    return 0
+    for line in unmapped_warning_lines(unmapped_categories(sets, traits, specs)):
+        print(line)
+    failures = check_feeds(feeds)
+    for msg in failures:
+        print(f"FAIL: {msg}", file=sys.stderr)
+    return 1 if failures else 0
 
 
 def _dump(out_dir: Path, with_passives: bool) -> int:
@@ -1012,6 +1081,8 @@ def _regenerate(cache_dir: Path | None, with_passives: bool, dry_run: bool) -> i
     # --- extract ---
     extracted = extract_skill_weapons(sets, traits, specs, passives)
     print(f"  extracted {len(extracted)} skill->weapon tokens")
+    for line in unmapped_warning_lines(unmapped_categories(sets, traits, specs)):
+        print(line)
 
     # --- build canonical (overlay = DEFAULT_OVERLAY) ---
     canonical = build_canonical(extracted, overlay=None, with_passives=bool(passives))

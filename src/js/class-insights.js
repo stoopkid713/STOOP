@@ -92,12 +92,22 @@
         let selectedEncounterData = null;  // Full data for selected encounter
         let hideAddsOtherInEncounters = true;  // Default to hiding adds and other
         
+        const SESSION_ENCOUNTERS_PAGE = 200;  // rows rendered per page (whole-folder lists can be huge)
+        let sessionEncountersLimit = SESSION_ENCOUNTERS_PAGE;
+
         function updateSessionEncountersList(encounters) {
             sessionEncounters = encounters || [];
+            sessionEncountersLimit = SESSION_ENCOUNTERS_PAGE;
+            renderSessionEncountersList();
+        }
+
+        function showMoreSessionEncounters() {
+            sessionEncountersLimit += SESSION_ENCOUNTERS_PAGE;
             renderSessionEncountersList();
         }
         
         function filterSessionEncounters() {
+            sessionEncountersLimit = SESSION_ENCOUNTERS_PAGE;
             renderSessionEncountersList();
         }
         
@@ -253,7 +263,7 @@
             
             let html = '';
             
-            filtered.forEach((enc, filteredIndex) => {
+            filtered.slice(0, sessionEncountersLimit).forEach((enc, filteredIndex) => {
                 // Find original index in sessionEncounters for selection
                 const originalIndex = sessionEncounters.findIndex(e => 
                     e.target_name === enc.target_name && e.start_time === enc.start_time
@@ -321,6 +331,11 @@
                 }
             });
             
+            if (filtered.length > sessionEncountersLimit) {
+                const remaining = filtered.length - sessionEncountersLimit;
+                html += `<button class="encounters-show-more" onclick="showMoreSessionEncounters()" style="width: 100%; padding: 8px 12px; margin-top: 4px; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 6px; color: #22c55e; font-size: 0.85rem; cursor: pointer; font-weight: 500;">Show more (${remaining} remaining)</button>`;
+            }
+
             container.innerHTML = html;
             
             // Update the hide adds/other button state

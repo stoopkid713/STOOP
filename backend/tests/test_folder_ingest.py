@@ -58,3 +58,14 @@ def test_encounter_history_whole_folder_is_optin(tmp_path):
     full = {e["target_name"] for e in server._encounter_history(whole_folder=True)}
     assert default == {"BossB"}                              # active (newest) file only
     assert {"BossA", "BossB"} <= full                        # opt-in captures both
+
+
+def test_encounter_history_reply_echoes_whole_folder(tmp_path):
+    """The reply says which kind of request it answers, so the frontend never has to infer it
+    from reply order (#69)."""
+    _write_log(tmp_path / "CombatLog_a.txt", "BossA", "10")
+    server = srv.DPSMeterServer(tmp_path, port=0)
+    server.config = {**server.config, "log_path": str(tmp_path)}
+
+    assert srv._h_get_encounter_history(server, {"whole_folder": True})["whole_folder"] is True
+    assert srv._h_get_encounter_history(server, {})["whole_folder"] is False
