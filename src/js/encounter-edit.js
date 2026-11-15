@@ -411,6 +411,7 @@
                 setConnectionStatus(true);
                 hideDisconnectedBanner();  // Hide banner when connected
                 if (reconnectInterval) { clearInterval(reconnectInterval); reconnectInterval = null; }
+                encounterHistoryPending = [];  // replies on the old socket will never arrive
                 sendCommand('get_config');
                 sendCommand('get_encounters');
                 sendCommand('get_saved_runs');
@@ -419,7 +420,7 @@
                 sendCommand('get_target_assignments');
                 sendCommand('get_default_targets');
                 sendCommand('get_dungeons');
-                sendCommand('get_encounter_history');  // Populate Encounters tab
+                requestSessionEncounters();  // Populate Encounters tab
                 sendCommand('get_suggested_names');     // B1: default the party display-name box
             };
             ws.onmessage = (event) => {
@@ -671,7 +672,7 @@
                     // Backend cleared saved encounters + runs; re-fetch the lists.
                     sendCommand('get_encounters');
                     sendCommand('get_saved_runs');
-                    sendCommand('get_encounter_history');
+                    requestSessionEncounters();
                     partyAlert('✅ App data reset — saved encounters and runs cleared.');
                 }
                 else if (msg.type === 'encounter_saved') {
@@ -777,16 +778,25 @@
                     console.log('[TargetAssign] Saved:', msg.target_name, '→', msg.category);
                 }
                 else if (msg.type === 'encounter_history') {
-                    displayEncounterHistory(msg.encounters || []);
-                    displayEncounterTimeline(msg.encounters || []); // Also populate timeline for Run Builder
-                    updateSessionEncountersList(msg.encounters || []); // Update Encounters tab
-                    
-                    // Track all target names for Target Assignment tab
-                    (msg.encounters || []).forEach(enc => {
-                        if (enc.target_name) {
-                            addTargetFromLog(enc.target_name);
-                        }
-                    });
+                    // Replies come back in request order; the reply carries no flag, so match it
+                    // to the request that asked for the whole folder (#69).
+                    const wholeFolder = encounterHistoryPending.shift() === true;
+                    if (wholeFolder) {
+                        // Whole-folder history feeds the Encounters list only (and only while
+                        // the toggle is still on) - not Run Builder or the target list.
+                        if (showAllLogs) updateSessionEncountersList(msg.encounters || []);
+                    } else {
+                        displayEncounterHistory(msg.encounters || []);
+                        displayEncounterTimeline(msg.encounters || []); // Also populate timeline for Run Builder
+                        if (!showAllLogs) updateSessionEncountersList(msg.encounters || []); // Update Encounters tab
+
+                        // Track all target names for Target Assignment tab
+                        (msg.encounters || []).forEach(enc => {
+                            if (enc.target_name) {
+                                addTargetFromLog(enc.target_name);
+                            }
+                        });
+                    }
                 }
                 else if (msg.type === 'encounter_details') {
                     // Full encounter details received
@@ -948,6 +958,28 @@
         function hideDisconnectedBanner() {
             const banner = document.getElementById('partyDisconnectedBanner');
             if (banner) banner.classList.remove('visible');
+        }
+
+        // get_encounter_history replies are not tagged, so remember which requests asked for the
+        // whole folder (FIFO, one entry per request) and match replies to them by order.
+        let encounterHistoryPending = [];
+        let showAllLogs = false;
+
+        function requestEncounterHistory(wholeFolder) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            encounterHistoryPending.push(!!wholeFolder);
+            ws.send(JSON.stringify(wholeFolder
+                ? { command: 'get_encounter_history', whole_folder: true }
+                : { command: 'get_encounter_history' }));
+        }
+
+        function requestSessionEncounters() {
+            requestEncounterHistory(showAllLogs);
+        }
+
+        function toggleShowAllLogs(on) {
+            showAllLogs = !!on;
+            requestSessionEncounters();
         }
 
         function sendCommand(command, data = {}) {

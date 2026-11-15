@@ -314,7 +314,7 @@
                 // Refresh encounter history when switching to Encounters tab
                 if (tab.dataset.tab === 'encounters') {
                     if (ws && ws.readyState === WebSocket.OPEN) {
-                        sendCommand('get_encounter_history');
+                        requestSessionEncounters();
                     }
                 }
 
